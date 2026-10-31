@@ -8,7 +8,7 @@ int spinel_main(int argc, char **argv);
 
 static void ruby_task(void *arg) {
   (void)arg;
-  char *argv[] = { "hello", NULL };
+  char *argv[] = { "main.rb", NULL };
   int rc = spinel_main(1, argv);
   fflush(stdout);
   printf("spinel_main returned %d (stack left %u bytes, free heap %u bytes)\n",

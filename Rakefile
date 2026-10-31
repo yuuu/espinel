@@ -57,9 +57,9 @@ task :menuconfig do
   container "idf.py", "menuconfig"
 end
 
-desc "Print the C that Spinel generates for lib/hello.rb"
+desc "Print the C that Spinel generates for lib/main.rb"
 task :c do
-  container "spinel", "lib/hello.rb", "-S"
+  container "spinel", "lib/main.rb", "-S"
 end
 
 desc "Decode backtrace addresses: rake addr2line ADDRS='0x4200760a 0x4202c085'"

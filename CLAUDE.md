@@ -24,7 +24,9 @@ kept in a separate work log, not in this repository.
 - `docker/Dockerfile`: `espressif/idf:v5.5.4` (QEMU included) plus Spinel
   built from the `spinel` build context. Sets `SPINEL_DIR=/opt/spinel` and
   puts `spinel` on `PATH`.
-- `main/`: compiles `lib/hello.rb` to C at build time
+- `lib/main.rb`: the Ruby entry point (fixed). Other files in `lib/` are
+  reached with `require_relative`, which Spinel resolves at compile time.
+- `main/`: compiles `lib/main.rb` to C at build time
   (`spinel ... -c --cc=<target gcc>`). The generated `main` is renamed with
   `-Dmain=spinel_main`, and `main.c` calls it from a FreeRTOS task with a
   32 KB stack (the main task's 3.5 KB is too small).

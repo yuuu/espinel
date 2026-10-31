@@ -32,7 +32,9 @@ Hello, world!
 spinel_main returned 0 (stack left 31580 bytes, free heap 320408 bytes)
 ```
 
-The Ruby program is `lib/hello.rb`; edit it and run `rake qemu` again.
+The Ruby program starts at `lib/main.rb`, the fixed entry point. Other files
+under `lib/` are pulled in with `require_relative`. Edit them and run
+`rake qemu` again.
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,
 so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:
@@ -42,7 +44,7 @@ so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:
 | `rake clobber` | remove `build/` and the generated `sdkconfig` |
 | `rake size` | show the firmware's memory usage |
 | `rake menuconfig` | open menuconfig |
-| `rake c` | print the C that Spinel generates for `lib/hello.rb` |
+| `rake c` | print the C that Spinel generates for `lib/main.rb` |
 | `rake addr2line ADDRS='0x... 0x...'` | decode a backtrace |
 | `rake shell` | open a shell in the container |
 | `rake exec CMD='...'` | run a command in the container |
