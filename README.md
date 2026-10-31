@@ -1,4 +1,4 @@
-# spinel-esp32
+# espinel
 
 An ESP-IDF project that runs Ruby programs compiled ahead of time by
 [Spinel](https://github.com/yuuu/spinel) on the ESP32-S3.
@@ -14,7 +14,7 @@ An ESP-IDF project that runs Ruby programs compiled ahead of time by
 Build the development image (ESP-IDF v5.5.4 plus a host build of Spinel):
 
 ```sh
-docker build --build-context spinel=../spinel -f docker/Dockerfile -t spinel-esp32-idf:v5.5.4 .
+docker build --build-context spinel=../spinel -f docker/Dockerfile -t espinel-idf:v5.5.4 .
 ```
 
 Rebuild the image whenever the Spinel checkout changes.

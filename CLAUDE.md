@@ -66,7 +66,7 @@ The model for all of this is Spinel's own wasm32-wasi port
   `sdkconfig` (and `build/`). Components that need `esp_psram` and the like
   must list it in their `REQUIRES`.
 - Debugging a crash: decode the backtrace with
-  `scripts/idf xtensa-esp32s3-elf-addr2line -pfiaC -e build/spinel_hello.elf <addrs>`.
+  `scripts/idf xtensa-esp32s3-elf-addr2line -pfiaC -e build/espinel.elf <addrs>`.
 - `scripts/run-qemu` filters out the image's ESP-IDF activation banner;
   `scripts/idf bash -c 'timeout 15 idf.py qemu </dev/null'` shows the raw
   output. `idf.py qemu monitor` needs a TTY.
