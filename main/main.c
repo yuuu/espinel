@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -10,7 +11,9 @@ static void ruby_task(void *arg) {
   char *argv[] = { "hello", NULL };
   int rc = spinel_main(1, argv);
   fflush(stdout);
-  printf("spinel_main returned %d\n", rc);
+  printf("spinel_main returned %d (stack left %u bytes, free heap %u bytes)\n",
+         rc, (unsigned)uxTaskGetStackHighWaterMark(NULL),
+         (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
   vTaskDelete(NULL);
 }
 

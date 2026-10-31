@@ -4,5 +4,7 @@
 set -e
 cd "$(dirname "$0")/.."
 tty=; [ -t 0 ] && tty=-it
-exec docker run --rm $tty -v "$PWD:/project" -w /project \
+# as the host user, so build/ and sdkconfig stay the user's
+exec docker run --rm $tty --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -v "$PWD:/project" -w /project \
   spinel-esp32-idf:v5.5.4 "$@"
