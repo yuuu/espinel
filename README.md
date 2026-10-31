@@ -6,25 +6,25 @@ An ESP-IDF project that runs Ruby programs compiled ahead of time by
 ## Requirements
 
 - Docker
+- Ruby (see `.ruby-version`) and Bundler, for the Rake tasks
 - A checkout of Spinel next to this directory (`../spinel`), with its
-  dependencies fetched (`make deps`)
+  dependencies fetched (`make deps`). Set `SPINEL_CHECKOUT` to use another
+  location.
 
 ## Usage
 
-Build the development image (ESP-IDF v5.5.4 plus a host build of Spinel):
-
 ```sh
-docker build --build-context spinel=../spinel -f docker/Dockerfile -t espinel-idf:v5.5.4 .
+bundle install
+bundle exec rake image   # build the development image (ESP-IDF v5.5.4 plus Spinel)
+bundle exec rake build   # build the firmware
+bundle exec rake qemu    # build and run it on the emulated ESP32-S3
+bundle exec rake clean   # remove build/
 ```
 
-Rebuild the image whenever the Spinel checkout changes.
+Rebuild the image (`rake image`) whenever the Spinel checkout changes.
 
-Build the firmware and run it on the emulated ESP32-S3 (QEMU). The console
-is printed until the given number of seconds (default 15) pass:
-
-```sh
-scripts/run-qemu [SECONDS]
-```
+`rake qemu` prints the console until 15 seconds pass; `rake qemu[30]` (or
+`QEMU_SECONDS=30`) runs it longer.
 
 ```
 I (76) main_task: Calling app_main()
@@ -32,15 +32,17 @@ Hello, world!
 spinel_main returned 0 (stack left 31580 bytes, free heap 320408 bytes)
 ```
 
-The Ruby program is `lib/hello.rb`; edit it and run `scripts/run-qemu`
-again.
+The Ruby program is `lib/hello.rb`; edit it and run `rake qemu` again.
 
-Run any other command in the container with `scripts/idf`, for example:
+Everything that needs ESP-IDF or Spinel runs in the container, as your user,
+so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:
 
-```sh
-scripts/idf idf.py build
-scripts/idf idf.py size
-scripts/idf idf.py menuconfig
-```
-
-The container runs as your user, so `build/` and `sdkconfig` stay yours.
+| Task | |
+|---|---|
+| `rake clobber` | remove `build/` and the generated `sdkconfig` |
+| `rake size` | show the firmware's memory usage |
+| `rake menuconfig` | open menuconfig |
+| `rake c` | print the C that Spinel generates for `lib/hello.rb` |
+| `rake addr2line ADDRS='0x... 0x...'` | decode a backtrace |
+| `rake shell` | open a shell in the container |
+| `rake exec CMD='...'` | run a command in the container |

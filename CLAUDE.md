@@ -12,11 +12,15 @@ kept in a separate work log, not in this repository.
   container). Supply what ESP-IDF lacks from `components/spinel/port/`. When
   a problem can only be fixed in Spinel itself, work around it here and note
   the cause.
-- Build and run only through Docker (`scripts/idf`, `scripts/run-qemu`).
-  There is no hardware attached; QEMU stands in for the board.
+- Build and run only through the Rake tasks (`bundle exec rake -T`), which
+  run ESP-IDF and Spinel in the Docker image. There is no hardware attached;
+  QEMU stands in for the board.
 
 ## Layout
 
+- `Rakefile`: host-side tasks. `container` runs a command in the image as
+  the host user with the project mounted at `/project`; a new task that
+  needs ESP-IDF or Spinel goes through it.
 - `docker/Dockerfile`: `espressif/idf:v5.5.4` (QEMU included) plus Spinel
   built from the `spinel` build context. Sets `SPINEL_DIR=/opt/spinel` and
   puts `spinel` on `PATH`.
@@ -66,9 +70,8 @@ The model for all of this is Spinel's own wasm32-wasi port
   `sdkconfig` (and `build/`). Components that need `esp_psram` and the like
   must list it in their `REQUIRES`.
 - Debugging a crash: decode the backtrace with
-  `scripts/idf xtensa-esp32s3-elf-addr2line -pfiaC -e build/espinel.elf <addrs>`.
-- `scripts/run-qemu` filters out the image's ESP-IDF activation banner;
-  `scripts/idf bash -c 'timeout 15 idf.py qemu </dev/null'` shows the raw
-  output. `idf.py qemu monitor` needs a TTY.
-- To inspect what Spinel generates, use
-  `scripts/idf spinel lib/hello.rb -S`.
+  `rake addr2line ADDRS='<addrs>'`.
+- `rake qemu` prints from the ROM banner on, dropping the image's ESP-IDF
+  activation output; `rake exec CMD='timeout 15 idf.py qemu </dev/null'`
+  shows everything. `idf.py qemu monitor` needs a TTY.
+- To inspect what Spinel generates, use `rake c`.

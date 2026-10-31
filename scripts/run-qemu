@@ -1,5 +1,0 @@
-#!/bin/sh
-# Build and run the firmware on the emulated ESP32-S3, printing the console
-# until SECONDS (default 15) pass:  scripts/run-qemu [SECONDS]
-cd "$(dirname "$0")/.."
-exec scripts/idf bash -c "idf.py build >/dev/null && timeout ${1:-15} idf.py qemu </dev/null 2>&1 | sed -n '/ESP-ROM/,\$p'"
