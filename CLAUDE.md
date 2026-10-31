@@ -72,9 +72,3 @@ The model for all of this is Spinel's own wasm32-wasi port
   output. `idf.py qemu monitor` needs a TTY.
 - To inspect what Spinel generates, use
   `scripts/idf spinel lib/hello.rb -S`.
-
-## Work log
-
-The user keeps a work log in a secret GitHub Gist. Show every entry in full
-and get the user's approval before publishing it, and write `~/` in place of
-home directory paths.
