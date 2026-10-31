@@ -32,7 +32,7 @@ Hello, world!
 spinel_main returned 0 (stack left 31580 bytes, free heap 320408 bytes)
 ```
 
-The Ruby program is `ruby/hello.rb`; edit it and run `scripts/run-qemu`
+The Ruby program is `lib/hello.rb`; edit it and run `scripts/run-qemu`
 again.
 
 Run any other command in the container with `scripts/idf`, for example:

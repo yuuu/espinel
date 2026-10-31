@@ -3,7 +3,7 @@
 # (`--ext-init`, which emits a library entry instead, does not compile for
 # a program this small: spinel_rt.h's SP_TU_NO_POLY_RENDER fallbacks clash
 # with the ext kernel's extern declarations, on any host.)
-set(RUBY_SRC ${CMAKE_CURRENT_LIST_DIR}/../ruby/hello.rb)
+set(RUBY_SRC ${CMAKE_CURRENT_LIST_DIR}/../lib/hello.rb)
 set(RUBY_C ${CMAKE_CURRENT_BINARY_DIR}/hello_rb.c)
 
 idf_component_register(SRCS "main.c" "${RUBY_C}"
