@@ -24,7 +24,7 @@ bundle exec rake clean   # remove build/
 Rebuild the image (`rake image`) whenever the Spinel checkout changes.
 
 `rake qemu` prints the console until 15 seconds pass; `rake qemu[30]` (or
-`QEMU_SECONDS=30`) runs it longer.
+`QEMU_SECONDS=30`) runs it longer. Press Ctrl+C to stop it earlier.
 
 ```
 I (76) main_task: Calling app_main()

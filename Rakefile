@@ -40,11 +40,15 @@ end
 desc "Build and run the firmware on the emulated ESP32-S3 for SECONDS (default 15)"
 task :qemu, [:seconds] => :build do |_, args|
   seconds = Integer(args[:seconds] || ENV.fetch("QEMU_SECONDS", "15"))
-  # From the ROM banner on: what comes before it is the image's ESP-IDF
-  # activation and esptool's output. `idf.py qemu monitor` needs a TTY;
-  # plain `idf.py qemu` runs QEMU on stdio, which timeout ends.
-  container "bash", "-c",
-            "timeout #{seconds} idf.py qemu </dev/null 2>&1 | sed -n '/ESP-ROM/,$p'"
+  container "bash", "-c", <<~SH
+    timeout #{seconds} idf.py qemu </dev/null > >(sed -n '/ESP-ROM/,$p') 2>&1 &
+    t=$!
+    trap 'kill -TERM $t 2>/dev/null' INT TERM
+    wait $t; rc=$?
+    [ $rc -gt 128 ] && { wait $t; rc=$?; }
+    wait
+    case $rc in 124|143) exit 0 ;; *) exit $rc ;; esac
+  SH
 end
 
 desc "Show the firmware's memory usage"
