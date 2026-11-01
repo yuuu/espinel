@@ -1,0 +1,4 @@
+[package]
+name = "gpio"
+version = "0.1.0"
+sources = ["gpio.c"]

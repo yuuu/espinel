@@ -7,8 +7,12 @@
 set(RUBY_LIB ${CMAKE_CURRENT_LIST_DIR}/../lib)
 set(RUBY_MAIN ${RUBY_LIB}/main.rb)
 set(RUBY_C ${CMAKE_CURRENT_BINARY_DIR}/main_rb.c)
-idf_component_register(SRCS "main.c" "${RUBY_C}"
-                       PRIV_REQUIRES spinel)
+# Packages under packages/<name>/<name>.rb resolve `require "<name>"`
+# (spinel -I packages); the C they carry is compiled here.
+set(RUBY_PACKAGES ${CMAKE_CURRENT_LIST_DIR}/../packages)
+file(GLOB PACKAGE_C_SRCS ${RUBY_PACKAGES}/*/*.c)
+idf_component_register(SRCS "main.c" "${RUBY_C}" ${PACKAGE_C_SRCS}
+                       PRIV_REQUIRES spinel esp_driver_gpio esp_timer)
 
 # ESP-IDF first reads this file in script mode, only for the requirements
 # above; the rest is for the real configure.
@@ -18,13 +22,13 @@ endif()
 
 # Every .rb under lib/: main.rb splices in what it require_relative's, so a
 # change to any of them recompiles the program.
-file(GLOB_RECURSE RUBY_SRCS CONFIGURE_DEPENDS ${RUBY_LIB}/*.rb)
+file(GLOB_RECURSE RUBY_SRCS CONFIGURE_DEPENDS ${RUBY_LIB}/*.rb ${RUBY_PACKAGES}/*.rb)
 
 # --cc names the target compiler so Spinel classifies integer literals for
 # its 32-bit Integer.
 add_custom_command(
   OUTPUT ${RUBY_C}
-  COMMAND spinel ${RUBY_MAIN} -c --cc=${CMAKE_C_COMPILER} -o ${RUBY_C}
+  COMMAND spinel -I ${RUBY_PACKAGES} ${RUBY_MAIN} -c --cc=${CMAKE_C_COMPILER} -o ${RUBY_C}
   DEPENDS ${RUBY_SRCS}
   COMMENT "Spinel: compiling lib/main.rb to C"
   VERBATIM)

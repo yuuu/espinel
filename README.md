@@ -27,14 +27,40 @@ Rebuild the image (`rake image`) whenever the Spinel checkout changes.
 `QEMU_SECONDS=30`) runs it longer. Press Ctrl+C to stop it earlier.
 
 ```
-I (76) main_task: Calling app_main()
-Hello, world!
-spinel_main returned 0 (stack left 31580 bytes, free heap 320408 bytes)
+I (91) main_task: Calling app_main()
+LED on
+LED off
+...
+spinel_main returned 0 (stack left 30052 bytes, free heap 313928 bytes)
 ```
 
 The Ruby program starts at `lib/main.rb`, the fixed entry point. Other files
 under `lib/` are pulled in with `require_relative`. Edit them and run
 `rake qemu` again.
+
+## Packages
+
+`require "<name>"` loads `packages/<name>/<name>.rb`, laid out as a spin
+package; the C a package carries (`packages/<name>/*.c`) is built into the
+firmware.
+
+| Package | |
+|---|---|
+| `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
+| `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
+
+```ruby
+require "gpio"
+require "machine"
+
+led = GPIO.new(2, GPIO::OUT)
+loop do
+  led.high
+  Machine.sleep(0.5)
+  led.low
+  Machine.sleep(0.5)
+end
+```
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,
 so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:

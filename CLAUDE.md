@@ -26,8 +26,14 @@ kept in a separate work log, not in this repository.
   puts `spinel` on `PATH`.
 - `lib/main.rb`: the Ruby entry point (fixed). Other files in `lib/` are
   reached with `require_relative`, which Spinel resolves at compile time.
+- `packages/<name>/`: spin-package layout (`<name>.rb`, `spin.toml`, carried
+  `.c`). `require "<name>"` finds them through `spinel -I packages`; their
+  `.c` files are compiled into the `main` component, whose `PRIV_REQUIRES`
+  must list the ESP-IDF components they use. Keep ESP-IDF enums and macros
+  on the C side behind plain `int`/`double` functions instead of copying
+  values into Ruby.
 - `main/`: compiles `lib/main.rb` to C at build time
-  (`spinel ... -c --cc=<target gcc>`). The generated `main` is renamed with
+  (`spinel -I packages ... -c --cc=<target gcc>`). The generated `main` is renamed with
   `-Dmain=spinel_main`, and `main.c` calls it from a FreeRTOS task with a
   32 KB stack (the main task's 3.5 KB is too small).
 - `components/spinel/`: Spinel's runtime (`RT_MEMBERS` and `RE_SRC` of
@@ -61,6 +67,16 @@ The model for all of this is Spinel's own wasm32-wasi port
   `malloc`), `sp_main_stack_run` runs the program on the calling task's
   stack, and `Fiber` cannot get a stack. Thread is not supported.
 - Integers are 32-bit (`sp_int` is the pointer width).
+- `Kernel#sleep` does not link: newlib here has no `nanosleep`. Use
+  `Machine.sleep`.
+- A program that reaches more of the runtime can need a POSIX call not
+  stubbed yet, showing up as a link error (`lstat` first did with
+  `machine`, whose argument is an Integer or a Float). Add it to
+  `port/sp_esp.c`.
+- QEMU does not emulate the ESP32-S3's GPIO: writes are dropped and every
+  GPIO register reads 0, so only that the calls succeed can be checked
+  there. `esp_rom_delay_us` counts CPU cycles and runs about 4x long under
+  QEMU; time with `esp_timer`, as `machine` does.
 - An uncaught exception calls `exit()`, which ESP-IDF turns into `abort()`
   and a reboot, so QEMU prints the program again every few seconds.
 - Memory: about 320 KB of free heap with internal RAM only. Spinel's GC
