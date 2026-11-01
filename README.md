@@ -1,15 +1,15 @@
 # espinel
 
 An ESP-IDF project that runs Ruby programs compiled ahead of time by
-[Spinel](https://github.com/yuuu/spinel) on the ESP32-S3.
+[Spinel](https://github.com/yuuu/spinel) on ESP32 SoCs. The ESP32-S3 is the
+one it has been run on; the others are being brought up (see Targets).
 
 ## Requirements
 
 - Docker
 - Ruby (see `.ruby-version`) and Bundler, for the Rake tasks
-- A checkout of Spinel next to this directory (`../spinel`), with its
-  dependencies fetched (`make deps`). Set `SPINEL_CHECKOUT` to use another
-  location.
+- A checkout of Spinel next to this directory (`../spinel`). Set
+  `SPINEL_CHECKOUT` to use another location.
 
 ## Usage
 
@@ -17,11 +17,17 @@ An ESP-IDF project that runs Ruby programs compiled ahead of time by
 bundle install
 bundle exec rake image   # build the development image (ESP-IDF v5.5.4 plus Spinel)
 bundle exec rake build   # build the firmware
-bundle exec rake qemu    # build and run it on the emulated ESP32-S3
+bundle exec rake qemu    # build and run it under QEMU
+bundle exec rake flash   # build and write it to a board over USB
+bundle exec rake monitor # reset the board and show its console
 bundle exec rake clean   # remove build/
 ```
 
 Rebuild the image (`rake image`) whenever the Spinel checkout changes.
+
+Builds go through ccache, kept in `.ccache/`, so a build after `rake clean`
+or a target switch mostly comes from the cache. `CCACHE=0` builds without
+it.
 
 `rake qemu` prints the console until 15 seconds pass; `rake qemu[30]` (or
 `QEMU_SECONDS=30`) runs it longer. Press Ctrl+C to stop it earlier.
@@ -33,6 +39,25 @@ LED off
 ...
 spinel_main returned 0 (stack left 30052 bytes, free heap 313928 bytes)
 ```
+
+`rake flash` and `rake monitor` run on the host, since Docker on macOS
+cannot pass a USB device into the container; they are plain Ruby
+(the [esp_flash](https://github.com/yuuu/esp_flash) gem, installed by
+`bundle install`), so the host needs no esptool or Python.
+The port is `PORT=/dev/...`, or the one connected board. `rake flash monitor`
+writes the firmware and then shows the output from the reset on. In the
+monitor, Ctrl-] quits and Ctrl-T Ctrl-R resets the board. The console is
+UART0 with USB Serial/JTAG as a secondary, output-only console, so the
+board's output reaches USB but input from it does not reach the program.
+
+## Targets
+
+The SoC to build for is chosen with `rake set-target TARGET=esp32s3` (or
+`rake build TARGET=esp32s3`); without one, ESP-IDF's default, the ESP32, is
+used. Either switches the SoC through `idf.py set-target`, which regenerates `sdkconfig`
+from `sdkconfig.defaults` plus `sdkconfig.defaults.<target>` where one
+exists, and empties `build/`. The target then stays until it is changed
+again. `rake flash`, `rake monitor` and `rake addr2line` follow it.
 
 The Ruby program starts at `lib/main.rb`, the fixed entry point. Other files
 under `lib/` are pulled in with `require_relative`. Edit them and run
@@ -67,7 +92,9 @@ so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:
 
 | Task | |
 |---|---|
+| `rake set-target TARGET=<soc>` | switch the SoC to build for |
 | `rake clobber` | remove `build/` and the generated `sdkconfig` |
+| `rake ccache` | show ccache's statistics |
 | `rake size` | show the firmware's memory usage |
 | `rake menuconfig` | open menuconfig |
 | `rake c` | print the C that Spinel generates for `lib/main.rb` |
