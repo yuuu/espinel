@@ -16,6 +16,7 @@
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <poll.h>
 #include <ucontext.h>
 #include <netdb.h>
@@ -49,6 +50,9 @@ int getcontext(ucontext_t *u) { (void)u; errno = ENOSYS; return -1; }
 int setcontext(const ucontext_t *u) { (void)u; errno = ENOSYS; return -1; }
 void makecontext(ucontext_t *u, void (*f)(void), int n, ...) { (void)u; (void)f; (void)n; }
 int swapcontext(ucontext_t *o, const ucontext_t *u) { (void)o; (void)u; errno = ENOSYS; return -1; }
+
+/* files: the VFS has no symbolic links, so lstat is stat */
+int lstat(const char *path, struct stat *st) { return stat(path, st); }
 
 /* resource limits */
 int getrlimit(int r, struct rlimit *l) { (void)r; (void)l; errno = ENOSYS; return -1; }
