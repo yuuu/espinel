@@ -13,17 +13,27 @@ kept in a separate work log, not in this repository.
   a problem can only be fixed in Spinel itself, work around it here and note
   the cause.
 - Build and run only through the Rake tasks (`bundle exec rake -T`), which
-  run ESP-IDF and Spinel in the Docker image. There is no hardware attached;
-  QEMU stands in for the board.
+  run ESP-IDF and Spinel in the Docker image. QEMU stands in for the board;
+  when a board is attached on USB, `rake flash` and `rake monitor` reach
+  it from the host (Docker on macOS cannot pass USB devices through).
 
 ## Layout
 
 - `Rakefile`: host-side tasks. `container` runs a command in the image as
   the host user with the project mounted at `/project`; a new task that
-  needs ESP-IDF or Spinel goes through it.
+  needs ESP-IDF or Spinel goes through it. The target SoC is whatever
+  `sdkconfig` records (`rake set-target`, or `TARGET=` on `rake build`;
+  ESP-IDF's default, `esp32`, when there is no `sdkconfig`).
+  `sdkconfig.defaults` must not name `CONFIG_IDF_TARGET`: `idf.py
+  set-target` refuses a target that differs from it. Per-target settings go in `sdkconfig.defaults.<target>`.
+- `rake flash` and `rake monitor` use the esp_flash gem (yuuu/esp_flash on
+  GitHub and RubyGems, a plain-Ruby ROM loader client and serial monitor).
+  They read the chip, images and baud rate from `build/flasher_args.json`
+  and `build/project_description.json`. Fix the gem there, not here.
 - `docker/Dockerfile`: `espressif/idf:v5.5.4` (QEMU included) plus Spinel
-  built from the `spinel` build context. Sets `SPINEL_DIR=/opt/spinel` and
-  puts `spinel` on `PATH`.
+  built from the `spinel` build context (with the prism gem, which Spinel's
+  build runs Ruby generators with, and `make deps`). Sets
+  `SPINEL_DIR=/opt/spinel` and puts `spinel` on `PATH`.
 - `lib/main.rb`: the Ruby entry point (fixed). Other files in `lib/` are
   reached with `require_relative`, which Spinel resolves at compile time.
 - `packages/<name>/`: spin-package layout (`<name>.rb`, `spin.toml`, carried
@@ -87,8 +97,17 @@ The model for all of this is Spinel's own wasm32-wasi port
 - New `sdkconfig.defaults` entries take effect only after deleting
   `sdkconfig` (and `build/`). Components that need `esp_psram` and the like
   must list it in their `REQUIRES`.
+- `container` turns on ESP-IDF's ccache (`IDF_CCACHE_ENABLE`, cache in
+  `/project/.ccache`) for every command, not only `idf.py build`: CMake
+  caches the setting, and a call that differs makes it reconfigure.
 - Debugging a crash: decode the backtrace with
   `rake addr2line ADDRS='<addrs>'`.
+- The console is UART0 (what QEMU shows) with USB Serial/JTAG as a
+  secondary, output-only console. `rake monitor` resets the board with the
+  port held open; the USB Serial/JTAG reset does not re-enumerate, and
+  reopening the port after a reset loses the program's first lines.
+- Only the ESP32-S3 has been run (QEMU and a board). The ESP32-C3 builds;
+  the other SoCs of issue #1 have not been tried.
 - `rake qemu` prints from the ROM banner on, dropping the image's ESP-IDF
   activation output; `rake exec CMD='timeout 15 idf.py qemu </dev/null'`
   shows everything. `idf.py qemu monitor` needs a TTY.

@@ -1,1 +1,3 @@
-CONFIG_IDF_TARGET="esp32s3"
+# Settings for every target. The target itself is chosen with
+# `rake set-target TARGET=<soc>`; per-target settings go in
+# sdkconfig.defaults.<soc>.
