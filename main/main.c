@@ -5,9 +5,12 @@
 
 /* the Ruby program's main, renamed (see CMakeLists.txt) */
 int spinel_main(int argc, char **argv);
+/* the GC's budget for this heap (components/spinel/port/sp_esp_gc.c) */
+void sp_esp_gc_init(void);
 
 static void ruby_task(void *arg) {
   (void)arg;
+  sp_esp_gc_init();
   char *argv[] = { "main.rb", NULL };
   int rc = spinel_main(1, argv);
   fflush(stdout);
