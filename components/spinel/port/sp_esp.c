@@ -7,6 +7,9 @@
      program body runs on the calling task's own stack;
    - signals: no handler is installed; no fault report, no trap;
    - *context: Fiber.new fails at its stack (no stack switching yet).
+   - processes and pipes: system answers nil, backticks "", and
+     Process.wait raises Errno::ECHILD;
+   - users: a single one, with every id 0.
 
    The headers beside this file declare what newlib and lwIP leave out. */
 #include <errno.h>
@@ -18,6 +21,9 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 #include <poll.h>
 #include <ucontext.h>
 #include <netdb.h>
@@ -52,8 +58,37 @@ int setcontext(const ucontext_t *u) { (void)u; errno = ENOSYS; return -1; }
 void makecontext(ucontext_t *u, void (*f)(void), int n, ...) { (void)u; (void)f; (void)n; }
 int swapcontext(ucontext_t *o, const ucontext_t *u) { (void)o; (void)u; errno = ENOSYS; return -1; }
 
-/* files: the VFS has no symbolic links, so lstat is stat */
+/* files: the VFS has no symbolic links, so lstat is stat; no file has
+   an owner or a creation mask, and every file is the caller's */
 int lstat(const char *path, struct stat *st) { return stat(path, st); }
+int symlink(const char *to, const char *from) { (void)to; (void)from; errno = ENOSYS; return -1; }
+int faccessat(int dirfd, const char *path, int mode, int flags) {
+  (void)dirfd; (void)flags;
+  return access(path, mode);
+}
+int utimensat(int dirfd, const char *path, const struct timespec t[2], int flags) {
+  (void)dirfd; (void)path; (void)t; (void)flags;
+  errno = ENOSYS;
+  return -1;
+}
+mode_t umask(mode_t m) { (void)m; return 022; }
+int dup(int fd) { (void)fd; errno = ENOSYS; return -1; }
+int dup2(int fd, int to) { (void)fd; (void)to; errno = ENOSYS; return -1; }
+int pipe(int fds[2]) { (void)fds; errno = ENOSYS; return -1; }
+
+/* users: one, with every id 0 */
+uid_t getuid(void) { return 0; }
+uid_t geteuid(void) { return 0; }
+gid_t getgid(void) { return 0; }
+gid_t getegid(void) { return 0; }
+int getgroups(int n, gid_t *g) { (void)n; (void)g; return 0; }
+
+/* processes: none to start or wait for (system and `` answer nil and "") */
+int execl(const char *p, const char *a, ...) { (void)p; (void)a; errno = ENOSYS; return -1; }
+int execvp(const char *f, char *const a[]) { (void)f; (void)a; errno = ENOSYS; return -1; }
+pid_t waitpid(pid_t p, int *st, int fl) { (void)p; (void)st; (void)fl; errno = ECHILD; return -1; }
+int setpgid(pid_t p, pid_t g) { (void)p; (void)g; errno = ENOSYS; return -1; }
+pid_t setsid(void) { errno = ENOSYS; return -1; }
 
 /* resource limits */
 int getrlimit(int r, struct rlimit *l) { (void)r; (void)l; errno = ENOSYS; return -1; }
@@ -64,6 +99,8 @@ ssize_t __getline(char **, size_t *, FILE *);
 ssize_t __getdelim(char **, size_t *, int, FILE *);
 ssize_t getline(char **b, size_t *n, FILE *f) { return __getline(b, n, f); }
 ssize_t getdelim(char **b, size_t *n, int d, FILE *f) { return __getdelim(b, n, d, f); }
+/* musl's count of bytes read ahead; newlib's FILE keeps it in _r, as BSD's does */
+size_t __freadahead(FILE *f) { return f->_r > 0 ? (size_t)f->_r : 0; }
 
 /* name resolution: lwIP's getaddrinfo answers EAI_* codes but has no text */
 const char *gai_strerror(int e) {
