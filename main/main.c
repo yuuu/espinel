@@ -15,6 +15,8 @@ int spinel_main(int argc, char **argv);
 void sp_esp_gc_init(void);
 /* SystemStackError near the end of this task's stack (stack_check.c) */
 void sp_esp_stack_check_init(void);
+/* /dev/urandom and rand's seed (components/spinel/port/sp_esp_random.c) */
+void sp_esp_random_init(void);
 
 /* exit() ends the Ruby program, not the chip. ESP-IDF's _exit is abort(),
    which panics and reboots, so every exit, exit!, abort and uncaught
@@ -43,6 +45,7 @@ void exit(int status) {
 static void ruby_task(void *arg) {
   (void)arg;
   sp_esp_gc_init();
+  sp_esp_random_init();
 #if CONFIG_ESPINEL_STACK_CHECK
   sp_esp_stack_check_init();
 #endif
