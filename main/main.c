@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "sdkconfig.h"
+#include "driver/uart.h"
+#include "driver/uart_vfs.h"
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -57,7 +59,20 @@ static void ruby_task(void *arg) {
   vTaskDelete(NULL);
 }
 
+/* stdin on the UART console. Without the UART driver the console's reads
+   do not block: gets answered nil at once, as at end of file, and the next
+   read never returned. With it a read blocks the task (other tasks run)
+   until a line comes, and a CR LF from a terminal reads as "\n". */
+static void console_stdin(void) {
+#if CONFIG_ESP_CONSOLE_UART
+  if (uart_driver_install(CONFIG_ESP_CONSOLE_UART_NUM, 256, 0, 0, NULL, 0) != ESP_OK) return;
+  uart_vfs_dev_use_driver(CONFIG_ESP_CONSOLE_UART_NUM);
+  uart_vfs_dev_port_set_rx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM, ESP_LINE_ENDINGS_CRLF);
+#endif
+}
+
 void app_main(void) {
+  console_stdin();
   /* the main task's 3.5 KB stack is too small for generated code */
   xTaskCreate(ruby_task, "ruby", 32 * 1024, NULL, 5, NULL);
 }
