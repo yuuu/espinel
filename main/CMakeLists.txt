@@ -12,7 +12,7 @@ set(RUBY_C ${CMAKE_CURRENT_BINARY_DIR}/main_rb.c)
 set(RUBY_PACKAGES ${CMAKE_CURRENT_LIST_DIR}/../packages)
 file(GLOB PACKAGE_C_SRCS ${RUBY_PACKAGES}/*/*.c)
 idf_component_register(SRCS "main.c" "${RUBY_C}" ${PACKAGE_C_SRCS}
-                       PRIV_REQUIRES spinel esp_driver_gpio esp_timer)
+                       PRIV_REQUIRES spinel esp_driver_gpio)
 
 # ESP-IDF first reads this file in script mode, only for the requirements
 # above; the rest is for the real configure.

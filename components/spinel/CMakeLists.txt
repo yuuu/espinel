@@ -28,7 +28,7 @@ endforeach()
 idf_component_register(SRCS ${srcs}
                        INCLUDE_DIRS port ${SPINEL_LIB}
                        PRIV_INCLUDE_DIRS ${SPINEL_LIB}/regexp ${SPINEL_LIB}/regexp/shim
-                       REQUIRES pthread lwip esp_hw_support heap
+                       REQUIRES pthread lwip esp_hw_support heap esp_timer
                        WHOLE_ARCHIVE)
 
 # What Spinel's Makefile gives the runtime (COPT, SEC_FLAGS) and the
