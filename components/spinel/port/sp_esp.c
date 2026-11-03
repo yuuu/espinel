@@ -10,6 +10,7 @@
 
    The headers beside this file declare what newlib and lwIP leave out. */
 #include <errno.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <stdio.h>
 #include <sys/select.h>
@@ -109,4 +110,10 @@ int poll(struct pollfd *fds, nfds_t n, int timeout_ms) {
     if (fds[i].revents) ready++;
   }
   return ready;
+}
+
+/* the generated C's empty inspector table: no kind indexes it */
+const char *sp_esp_insp_none(void *obj, const uint8_t *nb) {
+  (void)obj; (void)nb;
+  abort();
 }

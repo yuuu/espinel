@@ -19,4 +19,9 @@
 #define SP_STR_SHAPE_MAX     64     /* string-shape samples (8192) */
 #define SP_DYN_SYMS_MAX      256    /* symbols interned at run time (8192) */
 
+/* stands in for the NULL of an empty inspector table in the generated C
+   (main/CMakeLists.txt) */
+#include <stdint.h>
+const char *sp_esp_insp_none(void *obj, const uint8_t *nb);
+
 #endif
