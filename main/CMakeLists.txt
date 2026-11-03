@@ -11,7 +11,20 @@ set(RUBY_C ${CMAKE_CURRENT_BINARY_DIR}/main_rb.c)
 # (spinel -I packages); the C they carry is compiled here.
 set(RUBY_PACKAGES ${CMAKE_CURRENT_LIST_DIR}/../packages)
 file(GLOB PACKAGE_C_SRCS ${RUBY_PACKAGES}/*/*.c)
-idf_component_register(SRCS "main.c" "${RUBY_C}" ${PACKAGE_C_SRCS}
+# The C that Spinel's own bundled packages carry, for `require "json"` and
+# the like. Spinel's driver links a package's C only when the program
+# requires it (the generated C's SPINEL_LINK_OBJ markers); here all of it is
+# compiled into this component's archive, whose objects the linker takes
+# only when the program refers to them. zlib (libz), openssl, pty, ffi and
+# tmpdir are left out: ESP-IDF has nothing for them to stand on.
+set(SPINEL_PACKAGES $ENV{SPINEL_DIR}/packages)
+set(SPINEL_PACKAGE_C_SRCS
+  ${SPINEL_PACKAGES}/json/sp_json.c
+  ${SPINEL_PACKAGES}/stringio/sp_stringio.c
+  ${SPINEL_PACKAGES}/strscan/sp_strscan.c
+  ${SPINEL_PACKAGES}/base64/sp_base64.c)
+idf_component_register(SRCS "main.c" "${RUBY_C}" ${PACKAGE_C_SRCS} ${SPINEL_PACKAGE_C_SRCS}
+                       PRIV_INCLUDE_DIRS ${SPINEL_PACKAGES}/json ${SPINEL_PACKAGES}/stringio
                        PRIV_REQUIRES spinel esp_driver_gpio)
 
 # ESP-IDF first reads this file in script mode, only for the requirements
@@ -42,3 +55,7 @@ add_custom_command(
 # Generated C: Spinel's own warning policy (-Wno-all), not ESP-IDF's -Werror
 set_source_files_properties(${RUBY_C} PROPERTIES
   COMPILE_OPTIONS "-O2;-w;-Dmain=spinel_main")
+
+# Spinel's packages: Spinel's warning policy, as for the generated C
+set_source_files_properties(${SPINEL_PACKAGE_C_SRCS} PROPERTIES
+  COMPILE_OPTIONS "-O2;-w")
