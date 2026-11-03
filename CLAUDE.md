@@ -80,8 +80,11 @@ The model for all of this is Spinel's own wasm32-wasi port
   GPIO register reads 0, so only that the calls succeed can be checked
   there. `esp_rom_delay_us` counts CPU cycles and runs about 4x long under
   QEMU; time with `esp_timer`, as `machine` does.
-- An uncaught exception calls `exit()`, which ESP-IDF turns into `abort()`
-  and a reboot, so QEMU prints the program again every few seconds.
+- ESP-IDF's `_exit` is `abort()`, a panic and a reboot. `main.c` defines
+  `exit()` to run the `atexit` handlers, flush, and return to the Ruby
+  task, so `exit`, `exit!`, `abort` and an uncaught exception end with
+  `spinel_main returned <status>` and the chip idles. The program is not
+  run again: Spinel's state is not reset.
 - Memory: about 320 KB of free heap with internal RAM only. Spinel's GC
   thresholds (256 KB each for objects and strings) are sized for a desktop,
   and a failed `malloc`/`realloc` ends the program (`sp_oom_die`) without
