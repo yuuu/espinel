@@ -1,0 +1,14 @@
+menu "espinel"
+
+config ESPINEL_STACK_CHECK
+    bool "Raise SystemStackError before the Ruby task's stack runs out"
+    default y
+    help
+        Compile the generated C with -finstrument-functions so that every
+        Ruby method checks the stack on entry and raises SystemStackError
+        near its end (main/stack_check.c). Without it, a deep recursion runs
+        past the stack into the heap silently. The check costs time: about
+        a third on object-heavy code under QEMU, and more on small
+        recursive methods, which it keeps GCC from optimizing.
+
+endmenu
