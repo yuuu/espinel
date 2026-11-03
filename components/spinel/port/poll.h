@@ -1,4 +1,7 @@
-/* ESP-IDF's VFS has select() but no poll(); sp_esp.c builds poll on it. */
+/* newlib has no <poll.h>. ESP-IDF has a poll (<sys/poll.h>, built on the
+   VFS's select in newlib/src/poll.c), but with other POLL* values; this
+   header and the poll in sp_esp.c, which the link takes instead of
+   ESP-IDF's, stand in for both. */
 #ifndef SP_ESP_POLL_H
 #define SP_ESP_POLL_H
 #define POLLIN   0x001
