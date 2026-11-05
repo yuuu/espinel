@@ -78,8 +78,10 @@ The model for all of this is Spinel's own wasm32-wasi port
   `malloc`), `sp_main_stack_run` runs the program on the calling task's
   stack, and `Fiber` cannot get a stack. Thread is not supported.
 - Integers are 32-bit (`sp_int` is the pointer width).
-- `Kernel#sleep` does not link: newlib here has no `nanosleep`. Use
-  `Machine.sleep`.
+- newlib here has no `nanosleep`; `port/sp_esp.c` builds it on an
+  `esp_timer` one-shot, so `Kernel#sleep` and `Machine.sleep` block the
+  task (other tasks run) and wake at the microsecond. ESP-IDF's `usleep`
+  busy-waits anything under a tick.
 - A program that reaches more of the runtime can need a POSIX call not
   stubbed yet, showing up as a link error (`lstat` first did with
   `machine`, whose argument is an Integer or a Float). Add it to

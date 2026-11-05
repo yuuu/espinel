@@ -1,23 +1,12 @@
-/* The board's timing on ESP-IDF. Whole FreeRTOS ticks are waited with
-   vTaskDelay, which lets other tasks run; what is left of a tick (10 ms at
-   the default 100 Hz) is a busy wait on esp_timer, the clock the ticks
-   themselves follow. (esp_rom_delay_us counts CPU cycles, which QEMU does
-   not run at the chip's rate.) */
-#include <stdint.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_timer.h"
+/* The board's timing on ESP-IDF. Machine.sleep is nanosleep, which the
+   port builds on an esp_timer one-shot (components/spinel/port/sp_esp.c):
+   the task blocks, other tasks run, and it wakes at the microsecond. */
+#include <time.h>
 
 void espinel_machine_sleep(double seconds) {
-  int64_t us = (int64_t)(seconds * 1e6 + 0.5);
-  int64_t end = esp_timer_get_time() + us;
-  int64_t tick_us = (int64_t)portTICK_PERIOD_MS * 1000;
-  int64_t ticks = us / tick_us;
-  while (ticks > 0) {
-    TickType_t n = ticks > portMAX_DELAY - 1 ? portMAX_DELAY - 1 : (TickType_t)ticks;
-    vTaskDelay(n);
-    ticks -= n;
-  }
-  while (esp_timer_get_time() < end) {
-  }
+  struct timespec ts;
+  ts.tv_sec = (time_t)seconds;
+  ts.tv_nsec = (long)((seconds - (double)ts.tv_sec) * 1e9 + 0.5);
+  if (ts.tv_nsec >= 1000000000L) { ts.tv_sec++; ts.tv_nsec -= 1000000000L; }
+  nanosleep(&ts, NULL);
 }
