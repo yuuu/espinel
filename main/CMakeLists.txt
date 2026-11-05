@@ -29,6 +29,12 @@ file(GLOB_RECURSE RUBY_SRCS CONFIGURE_DEPENDS ${RUBY_LIB}/*.rb ${RUBY_PACKAGES}/
 add_custom_command(
   OUTPUT ${RUBY_C}
   COMMAND spinel -I ${RUBY_PACKAGES} ${RUBY_MAIN} -c --cc=${CMAKE_C_COMPILER} -o ${RUBY_C}
+  # A program with no ivar inspector gets an inspector table of { NULL }.
+  # GCC folds the call through it into a call to address 0, which the
+  # Xtensa linker refuses ("windowed longcall crosses 1GB boundary"), so the
+  # NULL becomes a stub that is never called (port/sp_esp.c). Spinel's
+  # src/codegen.c emits the NULL; nothing calls through an empty table.
+  COMMAND sed -i "s/^\\(static const char \\*(\\*const sp_insp_fn\\[\\])(void \\*, const uint8_t \\*) = {\\) NULL };$/\\1 sp_esp_insp_none };/" ${RUBY_C}
   DEPENDS ${RUBY_SRCS}
   COMMENT "Spinel: compiling lib/main.rb to C"
   VERBATIM)
