@@ -18,6 +18,7 @@
 #define SP_ALLOC_STATS       16     /* allocation profiler slots (8192) */
 #define SP_STR_SHAPE_MAX     64     /* string-shape samples (8192) */
 #define SP_DYN_SYMS_MAX      256    /* symbols interned at run time (8192) */
+#define SP_MAX_WORKERS       1      /* scheduler run queues: 64 B (256: 16 KB) */
 
 /* The GC's mark stack starts at 64 K entries (256 KB), more than the
    largest free block, so its malloc failed at every collection and marking

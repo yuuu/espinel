@@ -17,7 +17,7 @@ set(SPINEL_RT_MEMBERS
   sp_process sp_process_status)
 set(SPINEL_RE_SRCS re_compile re_exec re_utf8 unicase re_spinel)
 
-set(srcs port/sp_esp.c)
+set(srcs port/sp_esp.c port/sp_esp_gc.c)
 foreach(m ${SPINEL_RT_MEMBERS})
   list(APPEND srcs ${SPINEL_LIB}/${m}.c)
 endforeach()
@@ -28,7 +28,7 @@ endforeach()
 idf_component_register(SRCS ${srcs}
                        INCLUDE_DIRS port ${SPINEL_LIB}
                        PRIV_INCLUDE_DIRS ${SPINEL_LIB}/regexp ${SPINEL_LIB}/regexp/shim
-                       REQUIRES pthread lwip esp_hw_support
+                       REQUIRES pthread lwip esp_hw_support heap
                        WHOLE_ARCHIVE)
 
 # What Spinel's Makefile gives the runtime (COPT, SEC_FLAGS) and the
