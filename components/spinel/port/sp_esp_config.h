@@ -19,6 +19,12 @@
 #define SP_STR_SHAPE_MAX     64     /* string-shape samples (8192) */
 #define SP_DYN_SYMS_MAX      256    /* symbols interned at run time (8192) */
 
+/* The GC's mark stack starts at 64 K entries (256 KB), more than the
+   largest free block, so its malloc failed at every collection and marking
+   fell back to recursion on the task stack, which a long linked list
+   overflows. It grows by realloc from here. */
+#define SP_GC_MARK_STACK_MAX 1024   /* initial GC mark stack: 4 KB (64 K entries) */
+
 /* stands in for the NULL of an empty inspector table in the generated C
    (main/CMakeLists.txt) */
 #include <stdint.h>
