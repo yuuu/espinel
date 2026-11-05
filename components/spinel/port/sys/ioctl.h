@@ -1,4 +1,5 @@
-/* No terminals: the window-size query answers ENOTTY (sp_esp.c). */
+/* No terminals: newlib has no window-size request. The console's VFS has
+   no ioctl, so the query fails with ENOSYS (esp_vfs_ioctl). */
 #ifndef SP_ESP_SYS_IOCTL_H
 #define SP_ESP_SYS_IOCTL_H
 #include_next <sys/ioctl.h>

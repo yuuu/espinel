@@ -55,7 +55,8 @@ kept in a separate work log, not in this repository.
     lwIP leaves out.
   - `port/sp_esp.c`: the missing POSIX calls, each failing the way an
     unsupported call fails on POSIX (`-1`/`errno`, `MAP_FAILED`), so the
-    runtime takes the fallback it already has. `poll` is built on `select`.
+    runtime takes the fallback it already has. Its `poll`, built on
+    `select`, replaces ESP-IDF's (`sys/poll.h`, other `POLL*` values).
   - `port/sp_esp_config.h`: `-include`d into the runtime and the generated
     C. Holds `SP_NO_SIGNALS` and the shrunken static table sizes
     (`SP_GC_STACK_MAX` and others). Both halves of the program must see the
