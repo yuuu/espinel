@@ -34,10 +34,8 @@ it.
 
 ```
 I (91) main_task: Calling app_main()
-LED on
-LED off
-...
-spinel_main returned 0 (stack left 30052 bytes, free heap 313928 bytes)
+blinked; the LED now follows the button
+button released
 ```
 
 `rake flash` and `rake monitor` run on the host, since Docker on macOS
@@ -71,19 +69,18 @@ firmware.
 
 | Package | |
 |---|---|
-| `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
+| `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
 
 ```ruby
 require "gpio"
 require "machine"
 
-led = GPIO.new(2, GPIO::OUT)
+led = GPIO.new(1, GPIO::OUT)                     # XIAO ESP32S3's D0
+button = GPIO.new(5, GPIO::IN, GPIO::PULL_DOWN)  # D4, a button to 3.3V
 loop do
-  led.high
-  Machine.sleep(0.5)
-  led.low
-  Machine.sleep(0.5)
+  led.write(button.read)
+  Machine.sleep(0.01)
 end
 ```
 
