@@ -1,0 +1,4 @@
+[package]
+name = "i2c"
+version = "0.1.0"
+sources = ["i2c.c"]
