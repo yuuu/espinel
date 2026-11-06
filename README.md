@@ -71,6 +71,7 @@ firmware.
 |---|---|
 | `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
+| `spi` | `SPI.new(unit = 2, frequency: 1_000_000, mode: 0, first_bit: SPI::MSB_FIRST, sck_pin:, copi_pin:, cipo_pin:, cs_pin:)`, a controller on SPI2 or SPI3; `cs_pin:` (optional) is driven low for each call. `write(*outputs)` (Integers, Arrays of them, Strings), `read(bytes)` (sends zeros), `transfer(outputs, additional_read_bytes = 0)` answers the bytes clocked in, `setmode(...)` |
 
 ```ruby
 require "gpio"
@@ -82,6 +83,14 @@ loop do
   led.write(button.read)
   Machine.sleep(0.01)
 end
+```
+
+```ruby
+require "spi"
+
+# XIAO ESP32S3's D8, D10, D9, and D3 as the chip select
+spi = SPI.new(sck_pin: 7, copi_pin: 9, cipo_pin: 8, cs_pin: 4)
+id = spi.transfer(0x9f, 3).byteslice(1, 3)  # a flash chip's JEDEC ID
 ```
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,
