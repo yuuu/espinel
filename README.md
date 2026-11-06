@@ -71,6 +71,7 @@ firmware.
 |---|---|
 | `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
+| `i2c` | `I2C.new(unit = 0, frequency: 100_000, scl_pin:, sda_pin:)`, a controller with 7-bit addresses (the internal pull-ups are on, weak); `write(addr, *outputs)` (Integers, Arrays of them, Strings) answers the bytes written, `read(addr, bytes, *outputs)` writes the outputs and reads after a repeated start, `scan` lists the addresses that ACK. A NACK or a timeout raises `IOError` |
 
 ```ruby
 require "gpio"
@@ -82,6 +83,15 @@ loop do
   led.write(button.read)
   Machine.sleep(0.01)
 end
+```
+
+```ruby
+require "i2c"
+
+i2c = I2C.new(scl_pin: 6, sda_pin: 5)  # XIAO ESP32S3's D5, D4
+p i2c.scan                           # => [0x44], say
+i2c.write(0x44, 0x24, 0x00)          # SHT31: measure
+raw = i2c.read(0x44, 6)
 ```
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,
