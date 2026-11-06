@@ -92,6 +92,9 @@ The model for all of this is Spinel's own wasm32-wasi port
   stubbed yet, showing up as a link error (`lstat` first did with
   `machine`, whose argument is an Integer or a Float). Add it to
   `port/sp_esp.c`.
+- XIAO ESP32S3 pins: D0-D5 are GPIO1-6, D6/D7 GPIO43/44 (UART0, the
+  console), D8-D10 GPIO7-9. `gpio_reset_pin` turns the pull-up on, so
+  `espinel_gpio_setup` always sets the pull mode it is given.
 - QEMU does not emulate the ESP32-S3's GPIO: writes are dropped and every
   GPIO register reads 0, so only that the calls succeed can be checked
   there. `esp_rom_delay_us` counts CPU cycles and runs about 4x long under
