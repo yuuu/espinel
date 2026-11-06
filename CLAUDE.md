@@ -78,6 +78,12 @@ The model for all of this is Spinel's own wasm32-wasi port
   `malloc`), `sp_main_stack_run` runs the program on the calling task's
   stack, and `Fiber` cannot get a stack. Thread is not supported.
 - Integers are 32-bit (`sp_int` is the pointer width).
+- Spinel catches a C stack overflow with SIGSEGV on a guard page; there is
+  neither here. With `CONFIG_ESPINEL_STACK_CHECK` (on by default) the
+  generated C is built with `-finstrument-functions`, and
+  `main/stack_check.c` raises `SystemStackError` 6 KB short of the Ruby
+  task's stack end. Without it a deep recursion silently overwrites the
+  heap. The check makes method calls slower.
 - newlib here has no `nanosleep`; `port/sp_esp.c` builds it on an
   `esp_timer` one-shot, so `Kernel#sleep` and `Machine.sleep` block the
   task (other tasks run) and wake at the microsecond. ESP-IDF's `usleep`

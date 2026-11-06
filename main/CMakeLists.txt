@@ -23,7 +23,7 @@ set(SPINEL_PACKAGE_C_SRCS
   ${SPINEL_PACKAGES}/stringio/sp_stringio.c
   ${SPINEL_PACKAGES}/strscan/sp_strscan.c
   ${SPINEL_PACKAGES}/base64/sp_base64.c)
-idf_component_register(SRCS "main.c" "${RUBY_C}" ${PACKAGE_C_SRCS} ${SPINEL_PACKAGE_C_SRCS}
+idf_component_register(SRCS "main.c" "stack_check.c" "${RUBY_C}" ${PACKAGE_C_SRCS} ${SPINEL_PACKAGE_C_SRCS}
                        PRIV_INCLUDE_DIRS ${SPINEL_PACKAGES}/json ${SPINEL_PACKAGES}/stringio
                        PRIV_REQUIRES spinel esp_driver_gpio)
 
@@ -52,9 +52,16 @@ add_custom_command(
   COMMENT "Spinel: compiling lib/main.rb to C"
   VERBATIM)
 
-# Generated C: Spinel's own warning policy (-Wno-all), not ESP-IDF's -Werror
-set_source_files_properties(${RUBY_C} PROPERTIES
-  COMPILE_OPTIONS "-O2;-w;-Dmain=spinel_main")
+# Generated C: Spinel's own warning policy (-Wno-all), not ESP-IDF's -Werror.
+# With CONFIG_ESPINEL_STACK_CHECK its functions check the stack on entry
+# (stack_check.c); the runtime's inline helpers from spinel_rt.h are left
+# out, for speed.
+set(RUBY_C_OPTIONS -O2 -w -Dmain=spinel_main)
+if(CONFIG_ESPINEL_STACK_CHECK)
+  list(APPEND RUBY_C_OPTIONS -finstrument-functions
+       -finstrument-functions-exclude-file-list=$ENV{SPINEL_DIR}/lib)
+endif()
+set_source_files_properties(${RUBY_C} PROPERTIES COMPILE_OPTIONS "${RUBY_C_OPTIONS}")
 
 # Spinel's packages: Spinel's warning policy, as for the generated C
 set_source_files_properties(${SPINEL_PACKAGE_C_SRCS} PROPERTIES

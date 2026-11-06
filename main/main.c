@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "sdkconfig.h"
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -10,6 +11,8 @@
 int spinel_main(int argc, char **argv);
 /* the GC's budget for this heap (components/spinel/port/sp_esp_gc.c) */
 void sp_esp_gc_init(void);
+/* SystemStackError near the end of this task's stack (stack_check.c) */
+void sp_esp_stack_check_init(void);
 
 /* exit() ends the Ruby program, not the chip. ESP-IDF's _exit is abort(),
    which panics and reboots, so every exit, exit!, abort and uncaught
@@ -38,6 +41,9 @@ void exit(int status) {
 static void ruby_task(void *arg) {
   (void)arg;
   sp_esp_gc_init();
+#if CONFIG_ESPINEL_STACK_CHECK
+  sp_esp_stack_check_init();
+#endif
   char *argv[] = { "main.rb", NULL };
   int rc;
   ruby_task_handle = xTaskGetCurrentTaskHandle();
