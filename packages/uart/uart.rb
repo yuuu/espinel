@@ -42,13 +42,8 @@ class UART
       raise ArgumentError, "UART#{@unit}: no such unit"
     end
     check(ESPUART.espinel_uart_open(@unit), "setup")
-    @baudrate = baud || baudrate
-    @data_bits = data_bits
-    @stop_bits = stop_bits
-    @parity = parity
-    @flow_control = flow_control
     @rx = "".b
-    configure
+    configure(baud || baudrate, data_bits, stop_bits, parity, flow_control)
     set_pins(txd_pin, rxd_pin, rts_pin, cts_pin)
   end
 
@@ -57,13 +52,8 @@ class UART
   def setmode(baudrate: nil, baud: nil, data_bits: nil, stop_bits: nil,
               parity: nil, flow_control: nil,
               txd_pin: nil, rxd_pin: nil, rts_pin: nil, cts_pin: nil)
-    rate = baud || baudrate
-    @baudrate = rate unless rate.nil?
-    @data_bits = data_bits unless data_bits.nil?
-    @stop_bits = stop_bits unless stop_bits.nil?
-    @parity = parity unless parity.nil?
-    @flow_control = flow_control unless flow_control.nil?
-    configure
+    configure(baud || baudrate || @baudrate, data_bits || @data_bits,
+              stop_bits || @stop_bits, parity || @parity, flow_control || @flow_control)
     set_pins(txd_pin, rxd_pin, rts_pin, cts_pin)
     nil
   end
@@ -145,9 +135,15 @@ class UART
     raise ArgumentError, "UART#{@unit}: #{what} failed (#{ESPUART.esp_err_to_name(err)})"
   end
 
-  def configure
-    check(ESPUART.espinel_uart_config(@unit, @baudrate, @data_bits, @stop_bits,
-                                      @parity, @flow_control), "setup")
+  # The settings are kept once ESP-IDF has taken them.
+  def configure(baudrate, data_bits, stop_bits, parity, flow_control)
+    check(ESPUART.espinel_uart_config(@unit, baudrate, data_bits, stop_bits,
+                                      parity, flow_control), "setup")
+    @baudrate = baudrate
+    @data_bits = data_bits
+    @stop_bits = stop_bits
+    @parity = parity
+    @flow_control = flow_control
   end
 
   def set_pins(txd, rxd, rts, cts)
