@@ -42,6 +42,10 @@ kept in a separate work log, not in this repository.
   must list the ESP-IDF components they use. Keep ESP-IDF enums and macros
   on the C side behind plain `int`/`double` functions instead of copying
   values into Ruby.
+  Peripheral packages follow the mruby / mruby/c peripheral interface guide
+  (github.com/mruby/microcontroller-peripheral-interface-guide): its class
+  names, methods and keyword parameters. An `esp_err_t` other than `ESP_OK`
+  raises `ArgumentError` from a setup, `IOError` from a transfer.
 - `main/`: compiles `lib/main.rb` to C at build time
   (`spinel -I packages ... -c --cc=<target gcc>`). The generated `main` is renamed with
   `-Dmain=spinel_main`, and `main.c` calls it from a FreeRTOS task with a
@@ -115,6 +119,8 @@ The model for all of this is Spinel's own wasm32-wasi port
 - `container` turns on ESP-IDF's ccache (`IDF_CCACHE_ENABLE`, cache in
   `/project/.ccache`) for every command, not only `idf.py build`: CMake
   caches the setting, and a call that differs makes it reconfigure.
+- `UART.new(0)` reuses the console's driver (main.c) and applies its
+  settings to the console, the guide's 9600 baud default included.
 - Debugging a crash: decode the backtrace with
   `rake addr2line ADDRS='<addrs>'`.
 - The console is UART0 (what QEMU shows) with USB Serial/JTAG as a
