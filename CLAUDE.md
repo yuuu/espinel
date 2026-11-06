@@ -99,6 +99,8 @@ The model for all of this is Spinel's own wasm32-wasi port
   GPIO register reads 0, so only that the calls succeed can be checked
   there. `esp_rom_delay_us` counts CPU cycles and runs about 4x long under
   QEMU; time with `esp_timer`, as `machine` does.
+- LEDC (the `pwm` package) sets up without an error under QEMU, so the
+  timer and channel bookkeeping can be checked there, but not the output.
 - ESP-IDF's `_exit` is `abort()`, a panic and a reboot. `main.c` defines
   `exit()` to run the `atexit` handlers, flush, and return to the Ruby
   task, so `exit`, `exit!`, `abort` and an uncaught exception end with
