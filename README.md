@@ -71,6 +71,7 @@ firmware.
 |---|---|
 | `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
+| `pwm` | `PWM.new(pin, frequency:, duty: 50)` on the LEDC peripheral (without `frequency:` the pin is taken but not started); `frequency(hz)` (0 stops it, low), `period_us(us)`, `duty(percent)`, `pulse_width_us(us)`. One LEDC channel per PWM (8 on the ESP32-S3), at up to four frequencies at once |
 
 ```ruby
 require "gpio"
@@ -82,6 +83,14 @@ loop do
   led.write(button.read)
   Machine.sleep(0.01)
 end
+```
+
+```ruby
+require "pwm"
+
+servo = PWM.new(2, frequency: 50)  # XIAO ESP32S3's D1
+servo.pulse_width_us(1500)         # the middle
+led = PWM.new(1, frequency: 1000, duty: 10)
 ```
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,
