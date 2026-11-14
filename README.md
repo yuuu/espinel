@@ -73,6 +73,7 @@ firmware.
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
 | `mbedtls` | Mbed TLS, as in PicoRuby: `MbedTLS::Digest.new(:sha1 or :sha256)`, `MbedTLS::HMAC.new(key, "sha256")`, `MbedTLS::CMAC.new(key, "aes")`, `MbedTLS::Cipher.new("AES-128-CBC")` (and the 192/256-bit CBC and GCM suites, `Cipher.ciphers`), `MbedTLS::PKey::RSA` and `MbedTLS::PKey::EC` (`new(pem)`, `generate`, `sign(digest, data)`, `verify(digest, signature, data)`, `public_key`, `to_pem`). Results are binary Strings, as CRuby's OpenSSL gives; `free` does nothing, the GC frees everything |
 | `network` | `Network::WiFi`, as in PicoRuby: `init(country = nil)`, `connect_timeout(ssid, password, auth, seconds = 60)` with `Network::WiFi::Auth::OPEN`, `WPA_TKIP_PSK`, `WPA2_AES_PSK`, `WPA2_MIXED_PSK` or `WPA3_PSK` (the weakest security accepted), `disconnect`, `link_connected?`, `tcpip_link_status(_name)`, `ipv4_address`, `ipv4_netmask`, `ipv4_gateway`, `dhcp_supplied?`. `Network::Ethernet.connect_timeout(seconds = 60)` and the same address readers, for QEMU |
+| `ssl_socket` | TLS clients, as in PicoRuby: `SSLSocket.open(host, port, ctx = SSLContext.new)`, or `SSLSocket.new(tcp_socket, ctx)` with `hostname=` and `connect`; `write`, `puts`, `print`, `gets`, `read`, `readpartial`, `eof?`, `close` (`sync_close` also closes the TCP socket, by default), `timeout=`, `cipher`, `ssl_version`, `verify_result`. `SSLContext`: `verify_mode=` (`VERIFY_PEER`, the default, or `VERIFY_NONE`), `set_ca_pem`, `set_cert_pem`, `set_key_pem` |
 
 ```ruby
 require "gpio"
@@ -118,6 +119,24 @@ user-mode network. Call `Network::Ethernet.connect_timeout` in place of the
 Wi-Fi calls and the same socket code runs there, with the address 10.0.2.15,
 the host's network behind 10.0.2.2 and DNS at 10.0.2.3. Ethernet has no
 device on a chip.
+
+`require "ssl_socket"` adds TLS 1.2 over those sockets. With `VERIFY_PEER`
+and no CA of its own, an `SSLContext` checks the server against ESP-IDF's
+bundle of public root certificates, and its name against the one given to
+`SSLSocket.open` (or `hostname=`); certificate dates are not checked. Close
+each `SSLSocket`: a session holds about 20 KB the GC does not free, and
+four can be open at once. With about 300 KB of RAM, a large response is
+read in pieces (`gets`, `readpartial`) rather than whole: `read` of a
+94 KB page runs out of memory.
+
+```ruby
+require "ssl_socket"
+
+ssl = SSLSocket.open("example.com", 443)
+ssl.write("GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
+puts ssl.gets
+ssl.close
+```
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,
 so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:

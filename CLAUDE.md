@@ -111,6 +111,18 @@ The model for all of this is Spinel's own wasm32-wasi port
   every call. Spinel's `Base64.decode64` answers UTF-8 where CRuby's
   answers ASCII-8BIT, so its result compares unequal to the binary Strings
   the package returns until `.b`.
+- `packages/ssl_socket/`: TLS sessions live in a C table of four, freed
+  by `close` only. They run over the TCPSocket's descriptor with
+  `send`/`recv`, waiting with `select` (Spinel's sockets are blocking; a
+  deadline is waited on before each call). With no CA the config is
+  attached to ESP-IDF's certificate bundle; its verify callback refuses a
+  chain with `MBEDTLS_ERR_X509_FATAL_ERROR` and no flags, hence the
+  message `ssl_socket.c` substitutes. `HAVE_TIME_DATE` is off, so dates
+  are not checked. To test verification, badssl.com's hosts (example.com's
+  certificate also names `*.example.org`), and give `hostname=` even with
+  `VERIFY_NONE`: servers refuse a handshake without SNI.
+- Strings have their own GC budget (young 256 KB, old 1 MB) with no retune
+  hook; `sp_esp_gc_init` lowers both floors.
 - XIAO ESP32S3 pins: D0-D5 are GPIO1-6, D6/D7 GPIO43/44 (UART0, the
   console), D8-D10 GPIO7-9. `gpio_reset_pin` turns the pull-up on, so
   `espinel_gpio_setup` always sets the pull mode it is given.

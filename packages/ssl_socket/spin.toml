@@ -1,0 +1,4 @@
+[package]
+name = "ssl_socket"
+version = "0.1.0"
+sources = ["ssl_socket.c"]
