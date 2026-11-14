@@ -103,6 +103,10 @@ The model for all of this is Spinel's own wasm32-wasi port
   GPIO register reads 0, so only that the calls succeed can be checked
   there. `esp_rom_delay_us` counts CPU cycles and runs about 4x long under
   QEMU; time with `esp_timer`, as `machine` does.
+- QEMU does not emulate the ESP32-S3's SPI2 or SPI3: the bus and device
+  set up, and the first transfer never returns. The `spi` package's Ruby
+  side can be run on the host with a stub of its C functions
+  (`spinel -I packages ... --link stub.o`).
 - QEMU does not emulate the ESP32-S3's I2C either: a probe times out
   (`ESP_ERR_TIMEOUT`) and the transfers after it fail with
   `ESP_ERR_INVALID_STATE`, so QEMU checks only that the errors raise.

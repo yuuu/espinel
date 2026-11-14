@@ -72,6 +72,7 @@ firmware.
 | `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
 | `i2c` | `I2C.new(unit = 0, frequency: 100_000, scl_pin:, sda_pin:)`, a controller with 7-bit addresses (the internal pull-ups are on, weak); `write(addr, *outputs)` (Integers, Arrays of them, Strings) answers the bytes written, `read(addr, bytes, *outputs)` writes the outputs and reads after a repeated start, `scan` lists the addresses that ACK. A NACK or a timeout raises `IOError` |
+| `spi` | `SPI.new(unit = 2, frequency: 1_000_000, mode: 0, first_bit: SPI::MSB_FIRST, sck_pin:, copi_pin:, cipo_pin:, cs_pin:)`, a controller on SPI2 or SPI3; `cs_pin:` (optional) is driven low for each call. `write(*outputs)` (Integers, Arrays of them, Strings), `read(bytes)` (sends zeros), `transfer(outputs, additional_read_bytes = 0)` answers the bytes clocked in, `setmode(...)` |
 | `uart` | `UART.new(unit, baudrate: 9600, txd_pin:, rxd_pin:)` (also `data_bits:`, `stop_bits:`, `parity: UART::EVEN or UART::ODD`, `flow_control: UART::RTSCTS` with `rts_pin:`, `cts_pin:`); `write(string)`, `puts`, `read(bytes)` and `gets` (both wait), `bytes_available`, `can_read_line`, `flush`, `clear_rx_buffer`, `send_break(seconds)`, `setmode(...)`. Unit 0 is the console |
 
 ```ruby
@@ -87,6 +88,13 @@ end
 ```
 
 ```ruby
+require "spi"
+
+# XIAO ESP32S3's D8, D10, D9, and D3 as the chip select
+spi = SPI.new(sck_pin: 7, copi_pin: 9, cipo_pin: 8, cs_pin: 4)
+id = spi.transfer(0x9f, 3).byteslice(1, 3)  # a flash chip's JEDEC ID
+```
+
 require "i2c"
 
 i2c = I2C.new(scl_pin: 6, sda_pin: 5)  # XIAO ESP32S3's D5, D4
