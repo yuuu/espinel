@@ -92,6 +92,45 @@ loop do
 end
 ```
 
+The peripheral packages follow the
+[peripheral interface guide](https://github.com/mruby/microcontroller-peripheral-interface-guide)
+that mruby and mruby/c share, so programs and device drivers written for it
+carry over. An error from ESP-IDF raises: `ArgumentError` for a setting it
+refuses, `IOError` for a transfer that fails.
+
+```ruby
+require "uart"
+
+uart = UART.new(1, baudrate: 115200, txd_pin: 1, rxd_pin: 2)  # D0, D1
+uart.puts "hello"
+line = uart.gets  # waits for a line, "\n" included
+```
+
+```ruby
+require "i2c"
+
+i2c = I2C.new(scl_pin: 6, sda_pin: 5)  # XIAO ESP32S3's D5, D4
+p i2c.scan                           # => [0x44], say
+i2c.write(0x44, 0x24, 0x00)          # SHT31: measure
+raw = i2c.read(0x44, 6)
+```
+
+```ruby
+require "spi"
+
+# XIAO ESP32S3's D8, D10, D9, and D3 as the chip select
+spi = SPI.new(sck_pin: 7, copi_pin: 9, cipo_pin: 8, cs_pin: 4)
+id = spi.transfer(0x9f, 3).byteslice(1, 3)  # a flash chip's JEDEC ID
+```
+
+```ruby
+require "pwm"
+
+servo = PWM.new(2, frequency: 50)  # XIAO ESP32S3's D1
+servo.pulse_width_us(1500)         # the middle
+led = PWM.new(1, frequency: 1000, duty: 10)
+```
+
 ### Networking
 
 Sockets are Spinel's own `require "socket"`: `TCPSocket`, `TCPServer`,
@@ -141,43 +180,6 @@ ssl = SSLSocket.open("example.com", 443)
 ssl.write("GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
 puts ssl.gets
 ssl.close
-```
-
-```ruby
-require "pwm"
-
-servo = PWM.new(2, frequency: 50)  # XIAO ESP32S3's D1
-servo.pulse_width_us(1500)         # the middle
-led = PWM.new(1, frequency: 1000, duty: 10)
-```
-
-require "spi"
-
-# XIAO ESP32S3's D8, D10, D9, and D3 as the chip select
-spi = SPI.new(sck_pin: 7, copi_pin: 9, cipo_pin: 8, cs_pin: 4)
-id = spi.transfer(0x9f, 3).byteslice(1, 3)  # a flash chip's JEDEC ID
-```
-
-require "i2c"
-
-i2c = I2C.new(scl_pin: 6, sda_pin: 5)  # XIAO ESP32S3's D5, D4
-p i2c.scan                           # => [0x44], say
-i2c.write(0x44, 0x24, 0x00)          # SHT31: measure
-raw = i2c.read(0x44, 6)
-```
-
-The peripheral packages follow the
-[peripheral interface guide](https://github.com/mruby/microcontroller-peripheral-interface-guide)
-that mruby and mruby/c share, so programs and device drivers written for it
-carry over. An error from ESP-IDF raises: `ArgumentError` for a setting it
-refuses, `IOError` for a transfer that fails.
-
-```ruby
-require "uart"
-
-uart = UART.new(1, baudrate: 115200, txd_pin: 1, rxd_pin: 2)  # D0, D1
-uart.puts "hello"
-line = uart.gets  # waits for a line, "\n" included
 ```
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,
