@@ -128,8 +128,6 @@ The model for all of this is Spinel's own wasm32-wasi port
 - With `SP_ONE_STRING` a String is a GC object: the object budget covers
   strings, and the string heap's thresholds (`sp_str_threshold`) are never
   read.
-  `machine`, whose argument is an Integer or a Float). Add it to
-  `port/sp_esp.c`.
 - `packages/memory/` reads the Ruby task's stack size from `main.c`
   (`espinel_ruby_stack_size`) and the `SystemStackError` limit from
   `stack_check.c`, and Spinel's `sp_gc_bytes`, `sp_gc_threshold` and
