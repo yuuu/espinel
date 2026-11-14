@@ -92,6 +92,13 @@ The model for all of this is Spinel's own wasm32-wasi port
   stubbed yet, showing up as a link error (`lstat` first did with
   `machine`, whose argument is an Integer or a Float). Add it to
   `port/sp_esp.c`.
+- `packages/memory/` reads the Ruby task's stack size from `main.c`
+  (`espinel_ruby_stack_size`) and the `SystemStackError` limit from
+  `stack_check.c`, and Spinel's `sp_gc_bytes`, `sp_gc_threshold` and
+  `sp_gc_stat_*` directly. At the top level the program already uses about
+  5 KB of stack, and `p`/`inspect` briefly take 4 KB more (`sp_sprintf`).
+  `GC.start` runs an ordinary cycle, which sweeps the old generation only
+  every eighth time: what survived a collection and died since can stay.
 - XIAO ESP32S3 pins: D0-D5 are GPIO1-6, D6/D7 GPIO43/44 (UART0, the
   console), D8-D10 GPIO7-9. `gpio_reset_pin` turns the pull-up on, so
   `espinel_gpio_setup` always sets the pull mode it is given.

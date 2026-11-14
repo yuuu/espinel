@@ -71,6 +71,7 @@ firmware.
 |---|---|
 | `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
+| `memory` | `Memory.heap(region = :all)` (`:internal`, `:spiram`), `Memory.stack` (the Ruby task's: used here, peak, where `SystemStackError` comes) and `Memory.gc` (Spinel's counted bytes, next collection, collections) as Hashes of bytes; `Memory.report` prints them as three lines with bars, `Memory.summary` as one |
 
 ```ruby
 require "gpio"
