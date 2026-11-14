@@ -42,6 +42,10 @@ kept in a separate work log, not in this repository.
   must list the ESP-IDF components they use. Keep ESP-IDF enums and macros
   on the C side behind plain `int`/`double` functions instead of copying
   values into Ruby.
+  Peripheral packages follow the mruby / mruby/c peripheral interface guide
+  (github.com/mruby/microcontroller-peripheral-interface-guide): its class
+  names, methods and keyword parameters. An `esp_err_t` other than `ESP_OK`
+  raises `ArgumentError` from a setup, `IOError` from a transfer.
 - `main/`: compiles `lib/main.rb` to C at build time
   (`spinel -I packages ... -c --cc=<target gcc>`). The generated `main` is renamed with
   `-Dmain=spinel_main`, and `main.c` calls it from a FreeRTOS task with a
@@ -103,6 +107,9 @@ The model for all of this is Spinel's own wasm32-wasi port
   set up, and the first transfer never returns. The `spi` package's Ruby
   side can be run on the host with a stub of its C functions
   (`spinel -I packages ... --link stub.o`).
+- QEMU does not emulate the ESP32-S3's I2C either: a probe times out
+  (`ESP_ERR_TIMEOUT`) and the transfers after it fail with
+  `ESP_ERR_INVALID_STATE`, so QEMU checks only that the errors raise.
 - ESP-IDF's `_exit` is `abort()`, a panic and a reboot. `main.c` defines
   `exit()` to run the `atexit` handlers, flush, and return to the Ruby
   task, so `exit`, `exit!`, `abort` and an uncaught exception end with
@@ -119,6 +126,8 @@ The model for all of this is Spinel's own wasm32-wasi port
 - `container` turns on ESP-IDF's ccache (`IDF_CCACHE_ENABLE`, cache in
   `/project/.ccache`) for every command, not only `idf.py build`: CMake
   caches the setting, and a call that differs makes it reconfigure.
+- `UART.new(0)` reuses the console's driver (main.c) and applies its
+  settings to the console, the guide's 9600 baud default included.
 - Debugging a crash: decode the backtrace with
   `rake addr2line ADDRS='<addrs>'`.
 - The console is UART0 (what QEMU shows) with USB Serial/JTAG as a
