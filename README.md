@@ -71,6 +71,7 @@ firmware.
 |---|---|
 | `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
+| `uart` | `UART.new(unit, baudrate: 9600, txd_pin:, rxd_pin:)` (also `data_bits:`, `stop_bits:`, `parity: UART::EVEN or UART::ODD`, `flow_control: UART::RTSCTS` with `rts_pin:`, `cts_pin:`); `write(string)`, `puts`, `read(bytes)` and `gets` (both wait), `bytes_available`, `can_read_line`, `flush`, `clear_rx_buffer`, `send_break(seconds)`, `setmode(...)`. Unit 0 is the console |
 
 ```ruby
 require "gpio"
@@ -82,6 +83,20 @@ loop do
   led.write(button.read)
   Machine.sleep(0.01)
 end
+```
+
+The peripheral packages follow the
+[peripheral interface guide](https://github.com/mruby/microcontroller-peripheral-interface-guide)
+that mruby and mruby/c share, so programs and device drivers written for it
+carry over. An error from ESP-IDF raises: `ArgumentError` for a setting it
+refuses, `IOError` for a transfer that fails.
+
+```ruby
+require "uart"
+
+uart = UART.new(1, baudrate: 115200, txd_pin: 1, rxd_pin: 2)  # D0, D1
+uart.puts "hello"
+line = uart.gets  # waits for a line, "\n" included
 ```
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,
