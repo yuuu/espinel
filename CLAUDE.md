@@ -94,6 +94,15 @@ The model for all of this is Spinel's own wasm32-wasi port
   busy-waits anything under a tick.
 - A program that reaches more of the runtime can need a POSIX call not
   stubbed yet, showing up as a link error (`lstat` first did with
+  `machine`, whose argument is an Integer or a Float). Add it to
+  `port/sp_esp.c`.
+- `packages/memory/` reads the Ruby task's stack size from `main.c`
+  (`espinel_ruby_stack_size`) and the `SystemStackError` limit from
+  `stack_check.c`, and Spinel's `sp_gc_bytes`, `sp_gc_threshold` and
+  `sp_gc_stat_*` directly. At the top level the program already uses about
+  5 KB of stack, and `p`/`inspect` briefly take 4 KB more (`sp_sprintf`).
+  `GC.start` runs an ordinary cycle, which sweeps the old generation only
+  every eighth time: what survived a collection and died since can stay.
   `machine`, whose argument is an Integer or a Float; `gethostname` with
   `Socket.gethostname`). Add it to `port/sp_esp.c`.
 - Networking: sockets are Spinel's `require "socket"` (`sp_net.c`) on

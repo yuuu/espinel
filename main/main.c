@@ -9,6 +9,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+/* the Ruby task's stack, in bytes (packages/memory reports against it) */
+#define RUBY_STACK_SIZE (32 * 1024)
+const unsigned espinel_ruby_stack_size = RUBY_STACK_SIZE;
+
 /* the Ruby program's main, renamed (see CMakeLists.txt) */
 int spinel_main(int argc, char **argv);
 /* the GC's budget for this heap (components/spinel/port/sp_esp_gc.c) */
@@ -77,5 +81,5 @@ static void console_stdin(void) {
 void app_main(void) {
   console_stdin();
   /* the main task's 3.5 KB stack is too small for generated code */
-  xTaskCreate(ruby_task, "ruby", 32 * 1024, NULL, 5, NULL);
+  xTaskCreate(ruby_task, "ruby", RUBY_STACK_SIZE, NULL, 5, NULL);
 }

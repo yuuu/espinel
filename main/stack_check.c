@@ -31,6 +31,10 @@ __attribute__((no_instrument_function)) void sp_esp_stack_check_init(void) {
   stack_limit = (uintptr_t)pxTaskGetStackStart(NULL) + SP_ESP_STACK_MARGIN;
 }
 
+/* the address below which a Ruby method raises SystemStackError; 0 when
+   the check is off (packages/memory) */
+__attribute__((no_instrument_function)) uintptr_t sp_esp_stack_limit(void) { return stack_limit; }
+
 __attribute__((no_instrument_function)) void __cyg_profile_func_enter(void *fn, void *site) {
   (void)fn; (void)site;
   if (!stack_limit || (uintptr_t)__builtin_frame_address(0) >= stack_limit) return;
