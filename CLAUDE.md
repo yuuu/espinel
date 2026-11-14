@@ -90,8 +90,18 @@ The model for all of this is Spinel's own wasm32-wasi port
   busy-waits anything under a tick.
 - A program that reaches more of the runtime can need a POSIX call not
   stubbed yet, showing up as a link error (`lstat` first did with
-  `machine`, whose argument is an Integer or a Float). Add it to
-  `port/sp_esp.c`.
+  `machine`, whose argument is an Integer or a Float; `gethostname` with
+  `Socket.gethostname`). Add it to `port/sp_esp.c`.
+- Networking: sockets are Spinel's `require "socket"` (`sp_net.c`) on
+  lwIP; `packages/network/` only brings an interface up (Wi-Fi with
+  PicoRuby's `Network::WiFi` interface, and QEMU's OpenCores Ethernet,
+  `CONFIG_ETH_USE_OPENETH`, which `idf.py qemu` always attaches). Under
+  QEMU `esp_wifi_start` never returns (no RF to calibrate), so Wi-Fi is
+  tried on a board only. On the ESP32-C3 under QEMU a program that links
+  the Wi-Fi driver (any use of `network`) stops before `app_main`; sockets
+  alone run there. lwIP's `getaddrinfo` answers `EAI_FAIL` for every
+  DNS failure. `Addrinfo.tcp` not resolving a name and `TCPSocket.open`
+  refusing a block are Spinel's, on any host.
 - XIAO ESP32S3 pins: D0-D5 are GPIO1-6, D6/D7 GPIO43/44 (UART0, the
   console), D8-D10 GPIO7-9. `gpio_reset_pin` turns the pull-up on, so
   `espinel_gpio_setup` always sets the pull mode it is given.

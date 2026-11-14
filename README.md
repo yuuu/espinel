@@ -71,6 +71,7 @@ firmware.
 |---|---|
 | `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
+| `network` | `Network::WiFi`, as in PicoRuby: `init(country = nil)`, `connect_timeout(ssid, password, auth, seconds = 60)` with `Network::WiFi::Auth::OPEN`, `WPA_TKIP_PSK`, `WPA2_AES_PSK`, `WPA2_MIXED_PSK` or `WPA3_PSK` (the weakest security accepted), `disconnect`, `link_connected?`, `tcpip_link_status(_name)`, `ipv4_address`, `ipv4_netmask`, `ipv4_gateway`, `dhcp_supplied?`. `Network::Ethernet.connect_timeout(seconds = 60)` and the same address readers, for QEMU |
 
 ```ruby
 require "gpio"
@@ -83,6 +84,39 @@ loop do
   Machine.sleep(0.01)
 end
 ```
+
+### Networking
+
+Sockets are Spinel's own `require "socket"`: `TCPSocket`, `TCPServer`,
+`UDPSocket`, `Socket` and `Addrinfo`, with CRuby's interface and
+exceptions (`Socket::ResolutionError`, `Errno::ECONNREFUSED`,
+`IO::TimeoutError`, ...), over ESP-IDF's lwIP. They need an interface with
+an address first, which the `network` package brings up with PicoRuby's
+`Network::WiFi` interface. `connect_timeout` answers true once DHCP has
+given an address, false when the access point refuses (a wrong password,
+no network with the security asked for), and raises
+`Network::ConnectTimeout` when the time runs out.
+
+```ruby
+require "network"
+require "socket"
+
+Network::WiFi.init("JP")
+Network::WiFi.connect_timeout("my-ssid", "my-password", Network::WiFi::Auth::WPA2_AES_PSK, 30) or abort "refused"
+puts Network::WiFi.ipv4_address
+
+s = TCPSocket.new("example.com", 80)
+s.write("HEAD / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
+puts s.gets
+s.close
+```
+
+QEMU has no Wi-Fi (the driver stops in the RF calibration of
+`connect_timeout`), but `rake qemu` attaches an OpenCores Ethernet to QEMU's
+user-mode network. Call `Network::Ethernet.connect_timeout` in place of the
+Wi-Fi calls and the same socket code runs there, with the address 10.0.2.15,
+the host's network behind 10.0.2.2 and DNS at 10.0.2.3. Ethernet has no
+device on a chip.
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,
 so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:
