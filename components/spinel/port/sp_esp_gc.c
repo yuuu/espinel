@@ -8,11 +8,8 @@
    the floor and wraps the retune in a cap: the next collection comes before
    the heap's free space, less a reserve, is three quarters used.
 
-   Strings have a budget of their own, collected when the young strings
-   pass 256 KB or the old ones 1 MB, and no hook: their floors are lowered
-   instead. Spinel re-aims the young trigger at twice the live strings, so
-   the floor is what a program that keeps few strings and makes many (a
-   response read in chunks) collects at.
+   Strings count here too: with SP_ONE_STRING a String is an object, its
+   bytes inline, and the string heap's own budget is never consulted.
 
    It runs from the Ruby task before spinel_main, after Spinel's
    constructors have installed the retune hook it wraps. */
@@ -20,16 +17,12 @@
 #include "esp_heap_caps.h"
 
 extern size_t sp_gc_threshold, sp_gc_threshold_init, sp_gc_bytes;
-extern size_t sp_str_threshold, sp_str_threshold_init;
-extern size_t sp_str_old_threshold, sp_str_old_threshold_init;
 extern void (*sp_gc_obj_retune_hook)(size_t before);
 void sp_gc_retune_object(size_t before);
 
 #define SP_ESP_GC_FLOOR   (32 * 1024)  /* collect after this much at least */
 #define SP_ESP_GC_RESERVE (32 * 1024)  /* never budgeted: payloads, drivers */
 #define SP_ESP_GC_SHARE   75           /* percent of the rest */
-#define SP_ESP_GC_STR_FLOOR     (32 * 1024)  /* young strings */
-#define SP_ESP_GC_STR_OLD_FLOOR (64 * 1024)  /* old strings, for a major sweep */
 
 static void sp_esp_gc_retune(size_t before) {
   sp_gc_retune_object(before);
@@ -44,6 +37,4 @@ static void sp_esp_gc_retune(size_t before) {
 void sp_esp_gc_init(void) {
   sp_gc_threshold = sp_gc_threshold_init = SP_ESP_GC_FLOOR;
   sp_gc_obj_retune_hook = sp_esp_gc_retune;
-  sp_str_threshold = sp_str_threshold_init = SP_ESP_GC_STR_FLOOR;
-  sp_str_old_threshold = sp_str_old_threshold_init = SP_ESP_GC_STR_OLD_FLOOR;
 }

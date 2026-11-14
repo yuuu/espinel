@@ -121,8 +121,9 @@ The model for all of this is Spinel's own wasm32-wasi port
   are not checked. To test verification, badssl.com's hosts (example.com's
   certificate also names `*.example.org`), and give `hostname=` even with
   `VERIFY_NONE`: servers refuse a handshake without SNI.
-- Strings have their own GC budget (young 256 KB, old 1 MB) with no retune
-  hook; `sp_esp_gc_init` lowers both floors.
+- With `SP_ONE_STRING` a String is a GC object: the object budget covers
+  strings, and the string heap's thresholds (`sp_str_threshold`) are never
+  read.
 - XIAO ESP32S3 pins: D0-D5 are GPIO1-6, D6/D7 GPIO43/44 (UART0, the
   console), D8-D10 GPIO7-9. `gpio_reset_pin` turns the pull-up on, so
   `espinel_gpio_setup` always sets the pull mode it is given.
