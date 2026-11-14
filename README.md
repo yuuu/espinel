@@ -72,8 +72,11 @@ firmware.
 | `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
 | `i2c` | `I2C.new(unit = 0, frequency: 100_000, scl_pin:, sda_pin:)`, a controller with 7-bit addresses (the internal pull-ups are on, weak); `write(addr, *outputs)` (Integers, Arrays of them, Strings) answers the bytes written, `read(addr, bytes, *outputs)` writes the outputs and reads after a repeated start, `scan` lists the addresses that ACK. A NACK or a timeout raises `IOError` |
+| `mbedtls` | Mbed TLS, as in PicoRuby: `MbedTLS::Digest.new(:sha1 or :sha256)`, `MbedTLS::HMAC.new(key, "sha256")`, `MbedTLS::CMAC.new(key, "aes")`, `MbedTLS::Cipher.new("AES-128-CBC")` (and the 192/256-bit CBC and GCM suites, `Cipher.ciphers`), `MbedTLS::PKey::RSA` and `MbedTLS::PKey::EC` (`new(pem)`, `generate`, `sign(digest, data)`, `verify(digest, signature, data)`, `public_key`, `to_pem`). Results are binary Strings, as CRuby's OpenSSL gives; `free` does nothing, the GC frees everything |
+| `network` | `Network::WiFi`, as in PicoRuby: `init(country = nil)`, `connect_timeout(ssid, password, auth, seconds = 60)` with `Network::WiFi::Auth::OPEN`, `WPA_TKIP_PSK`, `WPA2_AES_PSK`, `WPA2_MIXED_PSK` or `WPA3_PSK` (the weakest security accepted), `disconnect`, `link_connected?`, `tcpip_link_status(_name)`, `ipv4_address`, `ipv4_netmask`, `ipv4_gateway`, `dhcp_supplied?`. `Network::Ethernet.connect_timeout(seconds = 60)` and the same address readers, for QEMU |
 | `pwm` | `PWM.new(pin, frequency:, duty: 50)` on the LEDC peripheral (without `frequency:` the pin is taken but not started); `frequency(hz)` (0 stops it, low), `period_us(us)`, `duty(percent)`, `pulse_width_us(us)`. One LEDC channel per PWM (8 on the ESP32-S3), at up to four frequencies at once |
 | `spi` | `SPI.new(unit = 2, frequency: 1_000_000, mode: 0, first_bit: SPI::MSB_FIRST, sck_pin:, copi_pin:, cipo_pin:, cs_pin:)`, a controller on SPI2 or SPI3; `cs_pin:` (optional) is driven low for each call. `write(*outputs)` (Integers, Arrays of them, Strings), `read(bytes)` (sends zeros), `transfer(outputs, additional_read_bytes = 0)` answers the bytes clocked in, `setmode(...)` |
+| `ssl_socket` | TLS clients, as in PicoRuby: `SSLSocket.open(host, port, ctx = SSLContext.new)`, or `SSLSocket.new(tcp_socket, ctx)` with `hostname=` and `connect`; `write`, `puts`, `print`, `gets`, `read`, `readpartial`, `eof?`, `close` (`sync_close` also closes the TCP socket, by default), `timeout=`, `cipher`, `ssl_version`, `verify_result`. `SSLContext`: `verify_mode=` (`VERIFY_PEER`, the default, or `VERIFY_NONE`), `set_ca_pem`, `set_cert_pem`, `set_key_pem` |
 | `uart` | `UART.new(unit, baudrate: 9600, txd_pin:, rxd_pin:)` (also `data_bits:`, `stop_bits:`, `parity: UART::EVEN or UART::ODD`, `flow_control: UART::RTSCTS` with `rts_pin:`, `cts_pin:`); `write(string)`, `puts`, `read(bytes)` and `gets` (both wait), `bytes_available`, `can_read_line`, `flush`, `clear_rx_buffer`, `send_break(seconds)`, `setmode(...)`. Unit 0 is the console |
 
 ```ruby
@@ -86,6 +89,57 @@ loop do
   led.write(button.read)
   Machine.sleep(0.01)
 end
+```
+
+### Networking
+
+Sockets are Spinel's own `require "socket"`: `TCPSocket`, `TCPServer`,
+`UDPSocket`, `Socket` and `Addrinfo`, with CRuby's interface and
+exceptions (`Socket::ResolutionError`, `Errno::ECONNREFUSED`,
+`IO::TimeoutError`, ...), over ESP-IDF's lwIP. They need an interface with
+an address first, which the `network` package brings up with PicoRuby's
+`Network::WiFi` interface. `connect_timeout` answers true once DHCP has
+given an address, false when the access point refuses (a wrong password,
+no network with the security asked for), and raises
+`Network::ConnectTimeout` when the time runs out.
+
+```ruby
+require "network"
+require "socket"
+
+Network::WiFi.init("JP")
+Network::WiFi.connect_timeout("my-ssid", "my-password", Network::WiFi::Auth::WPA2_AES_PSK, 30) or abort "refused"
+puts Network::WiFi.ipv4_address
+
+s = TCPSocket.new("example.com", 80)
+s.write("HEAD / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
+puts s.gets
+s.close
+```
+
+QEMU has no Wi-Fi (the driver stops in the RF calibration of
+`connect_timeout`), but `rake qemu` attaches an OpenCores Ethernet to QEMU's
+user-mode network. Call `Network::Ethernet.connect_timeout` in place of the
+Wi-Fi calls and the same socket code runs there, with the address 10.0.2.15,
+the host's network behind 10.0.2.2 and DNS at 10.0.2.3. Ethernet has no
+device on a chip.
+
+`require "ssl_socket"` adds TLS 1.2 over those sockets. With `VERIFY_PEER`
+and no CA of its own, an `SSLContext` checks the server against ESP-IDF's
+bundle of public root certificates, and its name against the one given to
+`SSLSocket.open` (or `hostname=`); certificate dates are not checked. Close
+each `SSLSocket`: a session holds about 20 KB the GC does not free, and
+four can be open at once. With about 300 KB of RAM, a large response is
+read in pieces (`gets`, `readpartial`) rather than whole: `read` of a
+94 KB page runs out of memory.
+
+```ruby
+require "ssl_socket"
+
+ssl = SSLSocket.open("example.com", 443)
+ssl.write("GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
+puts ssl.gets
+ssl.close
 ```
 
 ```ruby

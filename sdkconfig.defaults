@@ -1,3 +1,5 @@
 # Settings for every target. The target itself is chosen with
 # `rake set-target TARGET=<soc>`; per-target settings go in
 # sdkconfig.defaults.<soc>.
+# QEMU's OpenCores Ethernet, for running network programs without a board
+CONFIG_ETH_USE_OPENETH=y
