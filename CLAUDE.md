@@ -42,6 +42,10 @@ kept in a separate work log, not in this repository.
   must list the ESP-IDF components they use. Keep ESP-IDF enums and macros
   on the C side behind plain `int`/`double` functions instead of copying
   values into Ruby.
+  Peripheral packages follow the mruby / mruby/c peripheral interface guide
+  (github.com/mruby/microcontroller-peripheral-interface-guide): its class
+  names, methods and keyword parameters. An `esp_err_t` other than `ESP_OK`
+  raises `ArgumentError` from a setup, `IOError` from a transfer.
 - `main/`: compiles `lib/main.rb` to C at build time
   (`spinel -I packages ... -c --cc=<target gcc>`). The generated `main` is renamed with
   `-Dmain=spinel_main`, and `main.c` calls it from a FreeRTOS task with a
@@ -99,6 +103,40 @@ The model for all of this is Spinel's own wasm32-wasi port
   5 KB of stack, and `p`/`inspect` briefly take 4 KB more (`sp_sprintf`).
   `GC.start` runs an ordinary cycle, which sweeps the old generation only
   every eighth time: what survived a collection and died since can stay.
+  `machine`, whose argument is an Integer or a Float; `gethostname` with
+  `Socket.gethostname`). Add it to `port/sp_esp.c`.
+- Networking: sockets are Spinel's `require "socket"` (`sp_net.c`) on
+  lwIP; `packages/network/` only brings an interface up (Wi-Fi with
+  PicoRuby's `Network::WiFi` interface, and QEMU's OpenCores Ethernet,
+  `CONFIG_ETH_USE_OPENETH`, which `idf.py qemu` always attaches). Under
+  QEMU `esp_wifi_start` never returns (no RF to calibrate), so Wi-Fi is
+  tried on a board only. On the ESP32-C3 under QEMU a program that links
+  the Wi-Fi driver (any use of `network`) stops before `app_main`; sockets
+  alone run there. lwIP's `getaddrinfo` answers `EAI_FAIL` for every
+  DNS failure. `Addrinfo.tcp` not resolving a name and `TCPSocket.open`
+  refusing a block are Spinel's, on any host.
+- `packages/mbedtls/`: nothing finalizes an ffi `:ptr`, so no Mbed TLS
+  context lives in memory of its own. Digest/HMAC/CMAC/Cipher keep theirs
+  in an `IO::Buffer` the Ruby object owns, which needs a context that owns
+  no heap: true of SHA-1/SHA-256/AES/GCM with ESP-IDF's hardware SHA and
+  AES (the defaults), not of `mbedtls_md`/`mbedtls_cipher`, so HMAC and
+  CMAC are built on SHA-256 and AES. A key is kept as its PEM and parsed by
+  every call. Spinel's `Base64.decode64` answers UTF-8 where CRuby's
+  answers ASCII-8BIT, so its result compares unequal to the binary Strings
+  the package returns until `.b`.
+- `packages/ssl_socket/`: TLS sessions live in a C table of four, freed
+  by `close` only. They run over the TCPSocket's descriptor with
+  `send`/`recv`, waiting with `select` (Spinel's sockets are blocking; a
+  deadline is waited on before each call). With no CA the config is
+  attached to ESP-IDF's certificate bundle; its verify callback refuses a
+  chain with `MBEDTLS_ERR_X509_FATAL_ERROR` and no flags, hence the
+  message `ssl_socket.c` substitutes. `HAVE_TIME_DATE` is off, so dates
+  are not checked. To test verification, badssl.com's hosts (example.com's
+  certificate also names `*.example.org`), and give `hostname=` even with
+  `VERIFY_NONE`: servers refuse a handshake without SNI.
+- With `SP_ONE_STRING` a String is a GC object: the object budget covers
+  strings, and the string heap's thresholds (`sp_str_threshold`) are never
+  read.
 - XIAO ESP32S3 pins: D0-D5 are GPIO1-6, D6/D7 GPIO43/44 (UART0, the
   console), D8-D10 GPIO7-9. `gpio_reset_pin` turns the pull-up on, so
   `espinel_gpio_setup` always sets the pull mode it is given.
@@ -106,6 +144,15 @@ The model for all of this is Spinel's own wasm32-wasi port
   GPIO register reads 0, so only that the calls succeed can be checked
   there. `esp_rom_delay_us` counts CPU cycles and runs about 4x long under
   QEMU; time with `esp_timer`, as `machine` does.
+- LEDC (the `pwm` package) sets up without an error under QEMU, so the
+  timer and channel bookkeeping can be checked there, but not the output.
+- QEMU does not emulate the ESP32-S3's SPI2 or SPI3: the bus and device
+  set up, and the first transfer never returns. The `spi` package's Ruby
+  side can be run on the host with a stub of its C functions
+  (`spinel -I packages ... --link stub.o`).
+- QEMU does not emulate the ESP32-S3's I2C either: a probe times out
+  (`ESP_ERR_TIMEOUT`) and the transfers after it fail with
+  `ESP_ERR_INVALID_STATE`, so QEMU checks only that the errors raise.
 - ESP-IDF's `_exit` is `abort()`, a panic and a reboot. `main.c` defines
   `exit()` to run the `atexit` handlers, flush, and return to the Ruby
   task, so `exit`, `exit!`, `abort` and an uncaught exception end with
@@ -122,6 +169,8 @@ The model for all of this is Spinel's own wasm32-wasi port
 - `container` turns on ESP-IDF's ccache (`IDF_CCACHE_ENABLE`, cache in
   `/project/.ccache`) for every command, not only `idf.py build`: CMake
   caches the setting, and a call that differs makes it reconfigure.
+- `UART.new(0)` reuses the console's driver (main.c) and applies its
+  settings to the console, the guide's 9600 baud default included.
 - Debugging a crash: decode the backtrace with
   `rake addr2line ADDRS='<addrs>'`.
 - The console is UART0 (what QEMU shows) with USB Serial/JTAG as a

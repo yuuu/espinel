@@ -28,7 +28,9 @@
 #include <ucontext.h>
 #include <netdb.h>
 #include <stdint.h>
+#include <string.h>
 #include <time.h>
+#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -118,6 +120,13 @@ const char *gai_strerror(int e) {
   case EAI_FAMILY: return "ai_family not supported";
   default: return "Name resolution failed";
   }
+}
+
+/* the host name: the one lwIP gives every interface's DHCP requests */
+int gethostname(char *name, size_t len) {
+  if (!name || len <= strlen(CONFIG_LWIP_LOCAL_HOSTNAME)) { errno = ENAMETOOLONG; return -1; }
+  strcpy(name, CONFIG_LWIP_LOCAL_HOSTNAME);
+  return 0;
 }
 
 /* time: newlib has neither nanosleep nor pause. A sleep blocks the task

@@ -8,6 +8,9 @@
    the floor and wraps the retune in a cap: the next collection comes before
    the heap's free space, less a reserve, is three quarters used.
 
+   Strings count here too: with SP_ONE_STRING a String is an object, its
+   bytes inline, and the string heap's own budget is never consulted.
+
    It runs from the Ruby task before spinel_main, after Spinel's
    constructors have installed the retune hook it wraps. */
 #include <stddef.h>
