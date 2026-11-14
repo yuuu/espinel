@@ -71,6 +71,7 @@ firmware.
 |---|---|
 | `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
+| `mbedtls` | Mbed TLS, as in PicoRuby: `MbedTLS::Digest.new(:sha1 or :sha256)`, `MbedTLS::HMAC.new(key, "sha256")`, `MbedTLS::CMAC.new(key, "aes")`, `MbedTLS::Cipher.new("AES-128-CBC")` (and the 192/256-bit CBC and GCM suites, `Cipher.ciphers`), `MbedTLS::PKey::RSA` and `MbedTLS::PKey::EC` (`new(pem)`, `generate`, `sign(digest, data)`, `verify(digest, signature, data)`, `public_key`, `to_pem`). Results are binary Strings, as CRuby's OpenSSL gives; `free` does nothing, the GC frees everything |
 | `network` | `Network::WiFi`, as in PicoRuby: `init(country = nil)`, `connect_timeout(ssid, password, auth, seconds = 60)` with `Network::WiFi::Auth::OPEN`, `WPA_TKIP_PSK`, `WPA2_AES_PSK`, `WPA2_MIXED_PSK` or `WPA3_PSK` (the weakest security accepted), `disconnect`, `link_connected?`, `tcpip_link_status(_name)`, `ipv4_address`, `ipv4_netmask`, `ipv4_gateway`, `dhcp_supplied?`. `Network::Ethernet.connect_timeout(seconds = 60)` and the same address readers, for QEMU |
 
 ```ruby

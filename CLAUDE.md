@@ -102,6 +102,15 @@ The model for all of this is Spinel's own wasm32-wasi port
   alone run there. lwIP's `getaddrinfo` answers `EAI_FAIL` for every
   DNS failure. `Addrinfo.tcp` not resolving a name and `TCPSocket.open`
   refusing a block are Spinel's, on any host.
+- `packages/mbedtls/`: nothing finalizes an ffi `:ptr`, so no Mbed TLS
+  context lives in memory of its own. Digest/HMAC/CMAC/Cipher keep theirs
+  in an `IO::Buffer` the Ruby object owns, which needs a context that owns
+  no heap: true of SHA-1/SHA-256/AES/GCM with ESP-IDF's hardware SHA and
+  AES (the defaults), not of `mbedtls_md`/`mbedtls_cipher`, so HMAC and
+  CMAC are built on SHA-256 and AES. A key is kept as its PEM and parsed by
+  every call. Spinel's `Base64.decode64` answers UTF-8 where CRuby's
+  answers ASCII-8BIT, so its result compares unequal to the binary Strings
+  the package returns until `.b`.
 - XIAO ESP32S3 pins: D0-D5 are GPIO1-6, D6/D7 GPIO43/44 (UART0, the
   console), D8-D10 GPIO7-9. `gpio_reset_pin` turns the pull-up on, so
   `espinel_gpio_setup` always sets the pull mode it is given.
