@@ -46,6 +46,9 @@ kept in a separate work log, not in this repository.
   (github.com/mruby/microcontroller-peripheral-interface-guide): its class
   names, methods and keyword parameters. An `esp_err_t` other than `ESP_OK`
   raises `ArgumentError` from a setup, `IOError` from a transfer.
+  A feature with a slash resolves to `packages/<dir>/<name>/<name>.rb`
+  (`require "net/mqtt"`: `packages/net/mqtt/mqtt.rb`); Spinel's own
+  `net/http` is still found, as `-I` is searched file by file.
 - `main/`: compiles `lib/main.rb` to C at build time
   (`spinel -I packages ... -c --cc=<target gcc>`). The generated `main` is renamed with
   `-Dmain=spinel_main`, and `main.c` calls it from a FreeRTOS task with a
@@ -128,6 +131,19 @@ The model for all of this is Spinel's own wasm32-wasi port
 - With `SP_ONE_STRING` a String is a GC object: the object budget covers
   strings, and the string heap's thresholds (`sp_str_threshold`) are never
   read.
+- `packages/net/mqtt/` is Ruby only, after picoruby-net-mqtt. It does not
+  require `ssl_socket`: every use of `SSLSocket` is under
+  `defined?(SSLSocket)`, which Spinel folds at compile time, so a program
+  that does not require `ssl_socket` itself has no TLS code (a plain MQTT
+  program is about 770 KB, with TLS about 1 MB). The TCP and TLS sockets
+  are separate ivars, never one of two classes. A PUBLISH that comes while
+  an acknowledgement is awaited is queued for `receive`.
+- The app partition is 1.5 MB (`CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE`):
+  a program with TLS does not fit 1 MB.
+- QEMU runs inside the container, so its 10.0.2.2 is the container, not
+  the host. A server on the host (a broker started with
+  `docker run -p 1883:1883 eclipse-mosquitto`, say) is reached at the
+  Docker bridge's gateway, 172.17.0.1 by default.
 - `packages/memory/` reads the Ruby task's stack size from `main.c`
   (`espinel_ruby_stack_size`) and the `SystemStackError` limit from
   `stack_check.c`, and Spinel's `sp_gc_bytes`, `sp_gc_threshold` and
