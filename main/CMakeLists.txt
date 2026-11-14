@@ -26,8 +26,12 @@ set(SPINEL_PACKAGE_C_SRCS
 idf_component_register(SRCS "main.c" "stack_check.c" "${RUBY_C}" ${PACKAGE_C_SRCS} ${SPINEL_PACKAGE_C_SRCS}
                        PRIV_INCLUDE_DIRS ${SPINEL_PACKAGES}/json ${SPINEL_PACKAGES}/stringio
                        PRIV_REQUIRES spinel esp_driver_gpio esp_driver_uart
-                                     esp_netif esp_event esp_wifi esp_eth nvs_flash esp_timer
-                                     mbedtls)
+                                     esp_netif esp_event esp_wifi esp_eth nvs_flash
+                                     esp_timer mbedtls)
+                                     esp_driver_ledc)
+                       PRIV_REQUIRES spinel esp_driver_gpio esp_driver_uart
+                                     esp_driver_spi)
+                       PRIV_REQUIRES spinel esp_driver_gpio esp_driver_uart esp_driver_i2c)
 
 # ESP-IDF first reads this file in script mode, only for the requirements
 # above; the rest is for the real configure.
