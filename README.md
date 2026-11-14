@@ -74,6 +74,7 @@ firmware.
 | `i2c` | `I2C.new(unit = 0, frequency: 100_000, scl_pin:, sda_pin:)`, a controller with 7-bit addresses (the internal pull-ups are on, weak); `write(addr, *outputs)` (Integers, Arrays of them, Strings) answers the bytes written, `read(addr, bytes, *outputs)` writes the outputs and reads after a repeated start, `scan` lists the addresses that ACK. A NACK or a timeout raises `IOError` |
 | `mbedtls` | Mbed TLS, as in PicoRuby: `MbedTLS::Digest.new(:sha1 or :sha256)`, `MbedTLS::HMAC.new(key, "sha256")`, `MbedTLS::CMAC.new(key, "aes")`, `MbedTLS::Cipher.new("AES-128-CBC")` (and the 192/256-bit CBC and GCM suites, `Cipher.ciphers`), `MbedTLS::PKey::RSA` and `MbedTLS::PKey::EC` (`new(pem)`, `generate`, `sign(digest, data)`, `verify(digest, signature, data)`, `public_key`, `to_pem`). Results are binary Strings, as CRuby's OpenSSL gives; `free` does nothing, the GC frees everything |
 | `memory` | `Memory.heap(region = :all)` (`:internal`, `:spiram`), `Memory.stack` (the Ruby task's: used here, peak, where `SystemStackError` comes) and `Memory.gc` (Spinel's counted bytes, next collection, collections) as Hashes of bytes; `Memory.report` prints them as three lines with bars, `Memory.summary` as one |
+| `net/mqtt` | An MQTT 3.1.1 client, as in PicoRuby: `Net::MQTT::Client.new(host, port = 1883, client_id:, keep_alive: 60, clean_session: true, username:, password:, ssl: false, ssl_context:, will_topic:, will_payload:, will_qos:, will_retain:)` (or `Client.connect(...)` with a block); `connect`, `publish(topic, payload, retain: false, qos: 0)`, `subscribe(*topics, qos: 0)`, `unsubscribe(*topics)`, `receive(timeout: nil)` (`[topic, payload]`, or nil when the time ran out), `ping`, `disconnect`, `connected?`. QoS 0 and 1. A refused CONNECT raises `Net::MQTT::ConnectionError` |
 | `network` | `Network::WiFi`, as in PicoRuby: `init(country = nil)`, `connect_timeout(ssid, password, auth, seconds = 60)` with `Network::WiFi::Auth::OPEN`, `WPA_TKIP_PSK`, `WPA2_AES_PSK`, `WPA2_MIXED_PSK` or `WPA3_PSK` (the weakest security accepted), `disconnect`, `link_connected?`, `tcpip_link_status(_name)`, `ipv4_address`, `ipv4_netmask`, `ipv4_gateway`, `dhcp_supplied?`. `Network::Ethernet.connect_timeout(seconds = 60)` and the same address readers, for QEMU |
 | `pwm` | `PWM.new(pin, frequency:, duty: 50)` on the LEDC peripheral (without `frequency:` the pin is taken but not started); `frequency(hz)` (0 stops it, low), `period_us(us)`, `duty(percent)`, `pulse_width_us(us)`. One LEDC channel per PWM (8 on the ESP32-S3), at up to four frequencies at once |
 | `spi` | `SPI.new(unit = 2, frequency: 1_000_000, mode: 0, first_bit: SPI::MSB_FIRST, sck_pin:, copi_pin:, cipo_pin:, cs_pin:)`, a controller on SPI2 or SPI3; `cs_pin:` (optional) is driven low for each call. `write(*outputs)` (Integers, Arrays of them, Strings), `read(bytes)` (sends zeros), `transfer(outputs, additional_read_bytes = 0)` answers the bytes clocked in, `setmode(...)` |
@@ -180,6 +181,30 @@ ssl = SSLSocket.open("example.com", 443)
 ssl.write("GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
 puts ssl.gets
 ssl.close
+```
+
+`require "net/mqtt"` is an MQTT 3.1.1 client over those sockets, with
+PicoRuby's `Net::MQTT::Client` interface. There is no background task:
+`receive` sends the keep-alive pings while it waits, so a program that does
+other work between calls should call `receive(timeout: ...)` (or `ping`)
+more often than `keep_alive` seconds. For TLS, give `ssl: true` (the broker
+is checked as `SSLSocket.open` checks it) or an `ssl_context:`, and
+`require "ssl_socket"` too: a program without it leaves Mbed TLS out, about
+200 KB.
+
+```ruby
+require "net/mqtt"
+
+client = Net::MQTT::Client.new("broker.example.com", 1883, client_id: "xiao-1",
+                               will_topic: "xiao-1/status", will_payload: "offline")
+client.connect
+client.publish("xiao-1/status", "online", retain: true)
+client.subscribe("xiao-1/led", qos: 1)
+loop do
+  topic, payload = client.receive(timeout: 10)
+  puts "#{topic}: #{payload}" if topic
+  client.publish("xiao-1/uptime", Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i.to_s)
+end
 ```
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,

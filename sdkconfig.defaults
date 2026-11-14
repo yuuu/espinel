@@ -3,3 +3,6 @@
 # sdkconfig.defaults.<soc>.
 # QEMU's OpenCores Ethernet, for running network programs without a board
 CONFIG_ETH_USE_OPENETH=y
+# A 1.5 MB app partition in place of 1 MB (still within 2 MB of flash): a
+# program with TLS (Mbed TLS and the certificate bundle) is about 1 MB
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
