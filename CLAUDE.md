@@ -131,13 +131,17 @@ The model for all of this is Spinel's own wasm32-wasi port
 - With `SP_ONE_STRING` a String is a GC object: the object budget covers
   strings, and the string heap's thresholds (`sp_str_threshold`) are never
   read.
-- `packages/net/mqtt/` is Ruby only, after picoruby-net-mqtt. It does not
-  require `ssl_socket`: every use of `SSLSocket` is under
-  `defined?(SSLSocket)`, which Spinel folds at compile time, so a program
-  that does not require `ssl_socket` itself has no TLS code (a plain MQTT
-  program is about 770 KB, with TLS about 1 MB). The TCP and TLS sockets
-  are separate ivars, never one of two classes. A PUBLISH that comes while
-  an acknowledgement is awaited is queued for `receive`.
+- `packages/net/mqtt/` is Ruby only, after picoruby-net-mqtt. `Client`
+  (`mqtt.rb`) keeps the session and the public interface and delegates to
+  `Packet` (building, encoding, reading and taking apart packets; no I/O),
+  `Connection` (TCP or TLS to the broker) and `KeepAlive` (when to ping).
+  It does not require `ssl_socket`: every use of `SSLSocket` is in
+  `Connection` (and `Client#tls_context`) under `defined?(SSLSocket)`,
+  which Spinel folds at compile time, so a program that does not require
+  `ssl_socket` itself has no TLS code (a plain MQTT program is about
+  780 KB, with TLS about 1 MB). The TCP and TLS sockets are separate
+  ivars, never one of two classes. A PUBLISH that comes while an
+  acknowledgement is awaited is queued for `receive`.
 - The app partition is 1.5 MB (`CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE`):
   a program with TLS does not fit 1 MB.
 - QEMU runs inside the container, so its 10.0.2.2 is the container, not
