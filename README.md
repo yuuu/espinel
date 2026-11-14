@@ -71,7 +71,10 @@ firmware.
 |---|---|
 | `gpio` | `GPIO.new(pin, GPIO::OUT)` (or `GPIO::IN`, `GPIO::IN_OUT`), with `GPIO::PULL_UP` or `GPIO::PULL_DOWN` as a third argument (none by default); `high`, `low`, `write(0 or 1)`, `read`, `high?` |
 | `machine` | `Machine.sleep(seconds)`: waits like `Kernel#sleep`, fractions allowed, returns the seconds rounded |
+| `i2c` | `I2C.new(unit = 0, frequency: 100_000, scl_pin:, sda_pin:)`, a controller with 7-bit addresses (the internal pull-ups are on, weak); `write(addr, *outputs)` (Integers, Arrays of them, Strings) answers the bytes written, `read(addr, bytes, *outputs)` writes the outputs and reads after a repeated start, `scan` lists the addresses that ACK. A NACK or a timeout raises `IOError` |
 | `pwm` | `PWM.new(pin, frequency:, duty: 50)` on the LEDC peripheral (without `frequency:` the pin is taken but not started); `frequency(hz)` (0 stops it, low), `period_us(us)`, `duty(percent)`, `pulse_width_us(us)`. One LEDC channel per PWM (8 on the ESP32-S3), at up to four frequencies at once |
+| `spi` | `SPI.new(unit = 2, frequency: 1_000_000, mode: 0, first_bit: SPI::MSB_FIRST, sck_pin:, copi_pin:, cipo_pin:, cs_pin:)`, a controller on SPI2 or SPI3; `cs_pin:` (optional) is driven low for each call. `write(*outputs)` (Integers, Arrays of them, Strings), `read(bytes)` (sends zeros), `transfer(outputs, additional_read_bytes = 0)` answers the bytes clocked in, `setmode(...)` |
+| `uart` | `UART.new(unit, baudrate: 9600, txd_pin:, rxd_pin:)` (also `data_bits:`, `stop_bits:`, `parity: UART::EVEN or UART::ODD`, `flow_control: UART::RTSCTS` with `rts_pin:`, `cts_pin:`); `write(string)`, `puts`, `read(bytes)` and `gets` (both wait), `bytes_available`, `can_read_line`, `flush`, `clear_rx_buffer`, `send_break(seconds)`, `setmode(...)`. Unit 0 is the console |
 
 ```ruby
 require "gpio"
@@ -91,6 +94,35 @@ require "pwm"
 servo = PWM.new(2, frequency: 50)  # XIAO ESP32S3's D1
 servo.pulse_width_us(1500)         # the middle
 led = PWM.new(1, frequency: 1000, duty: 10)
+```
+
+require "spi"
+
+# XIAO ESP32S3's D8, D10, D9, and D3 as the chip select
+spi = SPI.new(sck_pin: 7, copi_pin: 9, cipo_pin: 8, cs_pin: 4)
+id = spi.transfer(0x9f, 3).byteslice(1, 3)  # a flash chip's JEDEC ID
+```
+
+require "i2c"
+
+i2c = I2C.new(scl_pin: 6, sda_pin: 5)  # XIAO ESP32S3's D5, D4
+p i2c.scan                           # => [0x44], say
+i2c.write(0x44, 0x24, 0x00)          # SHT31: measure
+raw = i2c.read(0x44, 6)
+```
+
+The peripheral packages follow the
+[peripheral interface guide](https://github.com/mruby/microcontroller-peripheral-interface-guide)
+that mruby and mruby/c share, so programs and device drivers written for it
+carry over. An error from ESP-IDF raises: `ArgumentError` for a setting it
+refuses, `IOError` for a transfer that fails.
+
+```ruby
+require "uart"
+
+uart = UART.new(1, baudrate: 115200, txd_pin: 1, rxd_pin: 2)  # D0, D1
+uart.puts "hello"
+line = uart.gets  # waits for a line, "\n" included
 ```
 
 Everything that needs ESP-IDF or Spinel runs in the container, as your user,

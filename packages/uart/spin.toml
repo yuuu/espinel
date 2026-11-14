@@ -1,0 +1,4 @@
+[package]
+name = "uart"
+version = "0.1.0"
+sources = ["uart.c"]
