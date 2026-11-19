@@ -5,3 +5,4 @@
 /dependencies.lock
 /CLAUDE.local.md
 /.ccache/
+/examples/*/config.rb

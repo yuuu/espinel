@@ -81,6 +81,7 @@ checkout is mounted into the container. `require "<package>"` still finds
 |---|---|
 | `blink` | blinks the board's own LED (GPIO21); nothing to wire |
 | `hello` | plain Ruby (a class, blocks, Hashes, an exception) and `Memory.report`; also runs under QEMU |
+| `wifi_https` | joins Wi-Fi and fetches https://example.com/ with the certificate checked; copy `config.example.rb` to `config.rb` (ignored by git) and set the SSID and password first |
 
 A build without `PROJECT` goes back to `lib/main.rb`.
 
