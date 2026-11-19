@@ -83,6 +83,7 @@ checkout is mounted into the container. `require "<package>"` still finds
 | `hello` | plain Ruby (a class, blocks, Hashes, an exception) and `Memory.report`; also runs under QEMU |
 | `wifi_https` | joins Wi-Fi and fetches https://example.com/ with the certificate checked; copy `config.example.rb` to `config.rb` (ignored by git) and set the SSID and password first |
 | `aws_iot` | connects to AWS IoT Core over MQTT with TLS and the thing's certificate, publishes telemetry every 10 seconds and prints what arrives on `<thing>/cmd`; set Wi-Fi, the endpoint, the thing's name, certificate and key in `config.rb` (from `config.example.rb`) |
+| `oled` | "Spinel on ESP32" animated on a 128x64 SSD1306 OLED at 0x3C (SDA to D4, SCL to D5): a scan line draws the title, the subtitle types itself, a glint sweeps across; the driver and a 5x7 font are plain Ruby beside it |
 
 A build without `PROJECT` goes back to `lib/main.rb`.
 
