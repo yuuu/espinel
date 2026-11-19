@@ -1,7 +1,7 @@
 require "json"
 require "esp_flash"
 
-IMAGE = "espinel-idf:v5.5.4"
+IMAGE = "espinel-idf:v6.1"
 SPINEL_CHECKOUT = ENV.fetch("SPINEL_CHECKOUT", "../spinel")
 
 CCACHE = ENV.fetch("CCACHE", "1") == "0" ? "0" : "1"

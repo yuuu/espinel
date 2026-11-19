@@ -1,6 +1,6 @@
 # Mbed TLS, with PicoRuby's interface (picoruby-mbedtls): MbedTLS::Digest,
-# HMAC, CMAC, Cipher and PKey::RSA / PKey::EC, on ESP-IDF's Mbed TLS and its
-# hardware SHA, AES and RSA. The C half is mbedtls.c in this package.
+# HMAC, CMAC, Cipher and PKey::RSA / PKey::EC, on ESP-IDF's SHA and AES
+# peripherals and Mbed TLS's keys. The C half is mbedtls.c in this package.
 #
 # The streaming objects keep their C context in an IO::Buffer, so the GC
 # frees it with them; a key is kept as its PEM. `free` is there for

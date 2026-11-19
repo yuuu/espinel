@@ -269,7 +269,7 @@ static esp_err_t eth_start(void) {
   eth_phy_config_t phy_conf = ETH_PHY_DEFAULT_CONFIG();
   phy_conf.autonego_timeout_ms = 100;
   esp_eth_mac_t *mac = esp_eth_mac_new_openeth(&mac_conf);
-  esp_eth_phy_t *phy = esp_eth_phy_new_dp83848(&phy_conf);
+  esp_eth_phy_t *phy = esp_eth_phy_new_generic(&phy_conf);
   if (!mac || !phy) return ESP_FAIL;
   esp_eth_config_t conf = ETH_DEFAULT_CONFIG(mac, phy);
   esp_eth_handle_t eth;

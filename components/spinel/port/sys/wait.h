@@ -1,4 +1,4 @@
-/* newlib's sys/wait.h has no WCOREDUMP; no process ever dumps core here.
+/* The C library's sys/wait.h has no WCOREDUMP; no process ever dumps core here.
    (Process::Status#coredump? reads it; with the runtime's -w an undeclared
    macro would become a call to a function nothing defines.) */
 #ifndef SP_ESP_SYS_WAIT_H
