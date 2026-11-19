@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "driver/spi_master.h"
+#include "freertos/FreeRTOS.h" /* portMAX_DELAY */
 
 #define ESPINEL_SPI_FIRST_UNIT 2
 #define ESPINEL_SPI_LAST_UNIT SOC_SPI_PERIPH_NUM

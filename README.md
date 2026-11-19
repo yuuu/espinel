@@ -15,7 +15,7 @@ one it has been run on; the others are being brought up (see Targets).
 
 ```sh
 bundle install
-bundle exec rake image   # build the development image (ESP-IDF v5.5.4 plus Spinel)
+bundle exec rake image   # build the development image (ESP-IDF v6.1 plus Spinel)
 bundle exec rake build   # build the firmware
 bundle exec rake qemu    # build and run it under QEMU
 bundle exec rake flash   # build and write it to a board over USB

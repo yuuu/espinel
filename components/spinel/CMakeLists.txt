@@ -36,3 +36,9 @@ idf_component_register(SRCS ${srcs}
 set(SPINEL_DEFS -DSP_ONE_STRING -ffp-contract=off -include sp_esp_config.h)
 target_compile_options(${COMPONENT_LIB} PUBLIC ${SPINEL_DEFS})
 target_compile_options(${COMPONENT_LIB} PRIVATE -O2 -Wno-all -w)
+
+# picolibc's fflush(NULL) dereferences the NULL instead of flushing every
+# stream; sp_esp.c's __wrap_fflush takes it (the runtime and main.c call it).
+if(CONFIG_LIBC_PICOLIBC)
+  target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=fflush")
+endif()

@@ -25,19 +25,26 @@ void sp_esp_random_init(void);
 /* exit() ends the Ruby program, not the chip. ESP-IDF's _exit is abort(),
    which panics and reboots, so every exit, exit!, abort and uncaught
    exception restarted the board and the program with it, over and over.
-   This exit does what newlib's does short of _exit (the atexit handlers,
-   Ruby's at_exit among them, then flushing) and returns to ruby_task as if
-   spinel_main had returned the status. Spinel's state is not reset, so
-   the program is not run again in the same boot. Called from any other
-   task, it ends as before. */
+   This exit does what the C library's does short of _exit (the atexit
+   handlers, Ruby's at_exit among them, then flushing) and returns to
+   ruby_task as if spinel_main had returned the status. Spinel's state is
+   not reset, so the program is not run again in the same boot. Called from
+   any other task, it ends as before. */
 static TaskHandle_t ruby_task_handle;
 static jmp_buf ruby_exit;
 static int ruby_exit_status;
 
+#if CONFIG_LIBC_NEWLIB
 void __call_exitprocs(int, void *);
+#define run_exit_handlers(status) __call_exitprocs(status, NULL)
+#else
+/* picolibc runs the atexit handlers from .fini_array, as its exit does */
+void __libc_fini_array(void);
+#define run_exit_handlers(status) __libc_fini_array()
+#endif
 
 void exit(int status) {
-  __call_exitprocs(status, NULL);
+  run_exit_handlers(status);
   fflush(NULL);
   if (ruby_task_handle && xTaskGetCurrentTaskHandle() == ruby_task_handle) {
     ruby_exit_status = status;

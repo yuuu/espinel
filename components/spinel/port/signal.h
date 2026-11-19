@@ -1,11 +1,12 @@
-/* newlib declares struct sigaction and sigprocmask but leaves out the
-   flags, siginfo_t and sigaltstack; sigaction itself answers ENOSYS in
-   sp_esp.c, so no handler is ever installed and the runtime's fallbacks
-   apply (no fault report, no guard-page overflow raise). */
+/* The C library declares struct sigaction and sigprocmask but leaves out
+   the flags, siginfo_t and sigaltstack; sigaction itself answers ENOSYS in
+   sp_esp.c, so no fault handler is ever installed and the runtime's
+   fallbacks apply (no fault report, no guard-page overflow raise). */
 #ifndef SP_ESP_SIGNAL_H
 #define SP_ESP_SIGNAL_H
-/* newlib keeps sa_sigaction and siginfo_t behind the realtime-signals
-   option; ask for them (there is no si_addr: it is the value's pointer) */
+/* newlib and picolibc keep sa_sigaction and siginfo_t behind the
+   realtime-signals option; ask for them (there is no si_addr: it is the
+   value's pointer) */
 #ifndef _POSIX_REALTIME_SIGNALS
 #define _POSIX_REALTIME_SIGNALS 1
 #endif

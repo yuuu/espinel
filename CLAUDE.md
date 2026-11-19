@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-An ESP-IDF (v5.5.4) project that runs Ruby compiled by Spinel, a Ruby AOT
+An ESP-IDF (v6.1) project that runs Ruby compiled by Spinel, a Ruby AOT
 compiler, on the ESP32-S3. Usage is in README.md. Plans and findings are
 kept in a separate work log, not in this repository.
 
@@ -30,7 +30,7 @@ kept in a separate work log, not in this repository.
   GitHub and RubyGems, a plain-Ruby ROM loader client and serial monitor).
   They read the chip, images and baud rate from `build/flasher_args.json`
   and `build/project_description.json`. Fix the gem there, not here.
-- `docker/Dockerfile`: `espressif/idf:v5.5.4` (QEMU included) plus Spinel
+- `docker/Dockerfile`: `espressif/idf:v6.1` (QEMU included) plus Spinel
   built from the `spinel` build context (with the prism gem, which Spinel's
   build runs Ruby generators with, and `make deps`). Sets
   `SPINEL_DIR=/opt/spinel` and puts `spinel` on `PATH`.
@@ -67,8 +67,8 @@ kept in a separate work log, not in this repository.
   compiled from `$SPINEL_DIR/lib` as it is.
   - `port/*.h`, `port/sys/*.h`: headers found before the toolchain's. They
     either stand in for a missing header (`sys/mman.h`, `poll.h`,
-    `ucontext.h`) or `#include_next` the real one and add what newlib or
-    lwIP leaves out.
+    `ucontext.h`) or `#include_next` the real one and add what the C
+    library or lwIP leaves out.
   - `port/sp_esp.c`: the missing POSIX calls, each failing the way an
     unsupported call fails on POSIX (`-1`/`errno`, `MAP_FAILED`), so the
     runtime takes the fallback it already has. Its `poll`, built on
@@ -100,7 +100,16 @@ The model for all of this is Spinel's own wasm32-wasi port
   `main/stack_check.c` raises `SystemStackError` 6 KB short of the Ruby
   task's stack end. Without it a deep recursion silently overwrites the
   heap. The check makes method calls slower.
-- newlib here has no `nanosleep`; `port/sp_esp.c` builds it on an
+- The C library is picolibc, ESP-IDF's default since v6.0
+  (`CONFIG_LIBC_NEWLIB` still builds: `port/` keeps both behind
+  `#if`). Its `fflush(NULL)` dereferences the NULL, so the spinel
+  component links with `--wrap=fflush` and `sp_esp.c` flushes stdout and
+  stderr for it (a File never closed loses its buffer at exit); `exit` in
+  `main.c` runs the `atexit` handlers through `__libc_fini_array`, and
+  `__freadahead` reads a `struct __file_bufio`. `signal` is picolibc's (it
+  shares an object with `raise`). termios (`IO#raw`, `IO#noecho`) needs
+  `CONFIG_VFS_SUPPORT_TERMIOS`, off by default since v6.0.
+- The C library here has no `nanosleep`; `port/sp_esp.c` builds it on an
   `esp_timer` one-shot, so `Kernel#sleep` and `Machine.sleep` block the
   task (other tasks run) and wake at the microsecond. ESP-IDF's `usleep`
   busy-waits anything under a tick.
@@ -118,13 +127,18 @@ The model for all of this is Spinel's own wasm32-wasi port
   alone run there. lwIP's `getaddrinfo` answers `EAI_FAIL` for every
   DNS failure. `Addrinfo.tcp` not resolving a name and `TCPSocket.open`
   refusing a block are Spinel's, on any host.
-- `packages/mbedtls/`: nothing finalizes an ffi `:ptr`, so no Mbed TLS
-  context lives in memory of its own. Digest/HMAC/CMAC/Cipher keep theirs
-  in an `IO::Buffer` the Ruby object owns, which needs a context that owns
-  no heap: true of SHA-1/SHA-256/AES/GCM with ESP-IDF's hardware SHA and
-  AES (the defaults), not of `mbedtls_md`/`mbedtls_cipher`, so HMAC and
-  CMAC are built on SHA-256 and AES. A key is kept as its PEM and parsed by
-  every call. Spinel's `Base64.decode64` answers UTF-8 where CRuby's
+- `packages/mbedtls/`: ESP-IDF v6 carries Mbed TLS 4, which drops the old
+  primitives (`mbedtls_sha256_*`, `mbedtls_aes_*`, `mbedtls_gcm_*`, RNG
+  callbacks) for PSA Crypto. Nothing finalizes an ffi `:ptr`, so no context
+  lives in memory of its own, and a PSA multipart operation cannot outlive
+  a call (ESP's PSA drivers `malloc` theirs). Digest/HMAC/CMAC/Cipher keep
+  their state in an `IO::Buffer` the Ruby object owns: SHA-1/SHA-256 on the
+  SHA peripheral through `sha/sha_core.h` (the state saved between calls,
+  as ESP's PSA driver does), AES and GCM through `aes/esp_aes.h` and
+  `aes/esp_aes_gcm.h` (plain structs); HMAC and CMAC are built on those. A
+  key is kept as its PEM and parsed by every call; a generated key is made
+  with `psa_generate_key`, copied into a `mbedtls_pk_context` and
+  destroyed in the same call. Spinel's `Base64.decode64` answers UTF-8 where CRuby's
   answers ASCII-8BIT, so its result compares unequal to the binary Strings
   the package returns until `.b`.
 - `packages/ssl_socket/`: TLS sessions live in a C table of four, freed

@@ -257,7 +257,8 @@ class SSLSocket
   def state = connected? ? "connected" : "closed"
 
   # Mbed TLS's verification flags for the server's certificate: 0 when it
-  # was verified (MBEDTLS_X509_BADCERT_* bits otherwise)
+  # was verified (MBEDTLS_X509_BADCERT_* bits otherwise; with VERIFY_NONE,
+  # MBEDTLS_X509_BADCERT_SKIP_VERIFY, 128)
   def verify_result = connected? ? ESPSSL.espinel_ssl_verify_result(@handle) : nil
 
   private

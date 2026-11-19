@@ -1,5 +1,5 @@
-/* newlib has no <poll.h>. ESP-IDF has a poll (<sys/poll.h>, built on the
-   VFS's select in newlib/src/poll.c), but with other POLL* values; this
+/* The C library has no <poll.h>. ESP-IDF has a poll (<sys/poll.h>, built
+   on the VFS's select in esp_libc/src/poll.c), but with other POLL* values; this
    header and the poll in sp_esp.c, which the link takes instead of
    ESP-IDF's, stand in for both. */
 #ifndef SP_ESP_POLL_H

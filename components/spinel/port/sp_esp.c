@@ -11,7 +11,8 @@
      Process.wait raises Errno::ECHILD;
    - users: a single one, with every id 0.
 
-   The headers beside this file declare what newlib and lwIP leave out. */
+   The headers beside this file declare what the C library (picolibc, or
+   newlib with CONFIG_LIBC_NEWLIB) and lwIP leave out. */
 #include <errno.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -31,6 +32,9 @@
 #include <string.h>
 #include <time.h>
 #include "sdkconfig.h"
+#if !CONFIG_LIBC_NEWLIB
+#include <stdio-bufio.h> /* struct __file_bufio, for __freadahead */
+#endif
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -46,8 +50,13 @@ int munmap(void *a, size_t n) { (void)a; (void)n; errno = ENOSYS; return -1; }
 int mprotect(void *a, size_t n, int p) { (void)a; (void)n; (void)p; errno = ENOSYS; return -1; }
 int madvise(void *a, size_t n, int adv) { (void)a; (void)n; (void)adv; return 0; }
 
-/* signals */
+/* signals. picolibc's signal shares an object with raise, which the
+   runtime calls, so it is picolibc's there: it records the handler for
+   raise, and nothing else raises a signal. raise with no handler ends in
+   _exit, which is abort() here, as newlib's raise is. */
+#if CONFIG_LIBC_NEWLIB
 _sig_func_ptr signal(int s, _sig_func_ptr h) { (void)s; (void)h; errno = ENOSYS; return SIG_ERR; }
+#endif
 int sigaction(int s, const struct sigaction *a, struct sigaction *o) {
   (void)s; (void)a; (void)o;
   errno = ENOSYS;
@@ -102,6 +111,7 @@ pid_t setsid(void) { errno = ENOSYS; return -1; }
 int getrlimit(int r, struct rlimit *l) { (void)r; (void)l; errno = ENOSYS; return -1; }
 int setrlimit(int r, const struct rlimit *l) { (void)r; (void)l; errno = ENOSYS; return -1; }
 
+#if CONFIG_LIBC_NEWLIB
 /* stdio: newlib's names for the POSIX line readers */
 ssize_t __getline(char **, size_t *, FILE *);
 ssize_t __getdelim(char **, size_t *, int, FILE *);
@@ -109,6 +119,31 @@ ssize_t getline(char **b, size_t *n, FILE *f) { return __getline(b, n, f); }
 ssize_t getdelim(char **b, size_t *n, int d, FILE *f) { return __getdelim(b, n, d, f); }
 /* musl's count of bytes read ahead; newlib's FILE keeps it in _r, as BSD's does */
 size_t __freadahead(FILE *f) { return f->_r > 0 ? (size_t)f->_r : 0; }
+#else
+/* picolibc keeps no list of open streams, so fflush(NULL), which the
+   runtime calls before it ends, flushes stdout and stderr: a File written
+   and never closed loses what is still buffered. (CMakeLists.txt wraps
+   fflush.) */
+int __real_fflush(FILE *f);
+int __wrap_fflush(FILE *f) {
+  if (f) return __real_fflush(f);
+  int rc = __real_fflush(stdout);
+  return __real_fflush(stderr) ? EOF : rc;
+}
+/* picolibc: no processes to open a pipe to (newlib's popen failed in vfork) */
+FILE *popen(const char *c, const char *m) { (void)c; (void)m; errno = ENOSYS; return NULL; }
+int pclose(FILE *f) { (void)f; errno = ECHILD; return -1; }
+/* musl's count of bytes read ahead: a pushed-back byte, plus what a buffered
+   stream (__SBUF, a struct __file_bufio) holds unread while reading */
+size_t __freadahead(FILE *f) {
+  size_t n = f->unget ? 1 : 0;
+  if (f->flags & __SBUF) {
+    struct __file_bufio *b = (struct __file_bufio *)f;
+    if (b->dir == __SRD && b->len > b->off) n += (size_t)(b->len - b->off);
+  }
+  return n;
+}
+#endif
 
 /* name resolution: lwIP's getaddrinfo answers EAI_* codes but has no text */
 const char *gai_strerror(int e) {
@@ -129,8 +164,8 @@ int gethostname(char *name, size_t len) {
   return 0;
 }
 
-/* time: newlib has neither nanosleep nor pause. A sleep blocks the task
-   on an esp_timer one-shot, so other tasks get the CPU and the wake-up
+/* time: the C library has neither nanosleep nor pause. A sleep blocks the
+   task on an esp_timer one-shot, so other tasks get the CPU and the wake-up
    comes at the microsecond asked for, not at a tick. (ESP-IDF's usleep
    busy-waits whatever is under a tick, with a CPU-cycle count that QEMU
    runs about 4x long.) Only the Ruby task sleeps here, so one timer and

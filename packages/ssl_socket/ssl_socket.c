@@ -21,7 +21,6 @@
 #include <sys/socket.h>
 #include "esp_crt_bundle.h"
 #include "esp_log.h"
-#include "esp_random.h"
 #include "esp_timer.h"
 #include "mbedtls/error.h"
 #include "mbedtls/net_sockets.h"
@@ -49,12 +48,6 @@ typedef struct {
 
 static session_t *sessions[SSL_SESSIONS];
 static char message[256];
-
-static int rng(void *p, unsigned char *buf, size_t n) {
-  (void)p;
-  esp_fill_random(buf, n);
-  return 0;
-}
 
 /* why the last call failed */
 const char *espinel_ssl_message(void) { return message; }
@@ -162,7 +155,7 @@ static int parse_key(mbedtls_pk_context *key, const char *pem, size_t n) {
   if (!buf) return SSL_ERR_NO_MEM;
   memcpy(buf, pem, n);
   buf[n] = '\0';
-  int rc = mbedtls_pk_parse_key(key, buf, strstr((char *)buf, "-----BEGIN") ? n + 1 : n, NULL, 0, rng, NULL);
+  int rc = mbedtls_pk_parse_key(key, buf, strstr((char *)buf, "-----BEGIN") ? n + 1 : n, NULL, 0);
   mbedtls_platform_zeroize(buf, n + 1);
   free(buf);
   return rc;
@@ -208,7 +201,6 @@ int espinel_ssl_connect(int fd, const char *host, int verify, const char *ca, si
   int rc = mbedtls_ssl_config_defaults(&s->conf, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM,
                                        MBEDTLS_SSL_PRESET_DEFAULT);
   if (!rc) {
-    mbedtls_ssl_conf_rng(&s->conf, rng, NULL);
     mbedtls_ssl_conf_authmode(&s->conf, verify ? MBEDTLS_SSL_VERIFY_REQUIRED : MBEDTLS_SSL_VERIFY_NONE);
     if (ca_n > 0) {
       what = "CA certificate";

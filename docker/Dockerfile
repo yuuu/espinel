@@ -1,7 +1,7 @@
-# ESP-IDF v5.5 (with qemu-xtensa) plus a host build of the Spinel compiler.
+# ESP-IDF v6.1 (with qemu-xtensa) plus a host build of the Spinel compiler.
 # The Spinel tree comes in as the `spinel` build context:
 #   docker build --build-context spinel=../spinel -f docker/Dockerfile .
-FROM espressif/idf:v5.5.4
+FROM espressif/idf:v6.1
 
 # Spinel's host build needs a C compiler, make and curl (all in the image),
 # plus the prism gem for the Ruby generator of
