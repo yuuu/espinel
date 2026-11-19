@@ -6,12 +6,41 @@ SPINEL_CHECKOUT = ENV.fetch("SPINEL_CHECKOUT", "../spinel")
 
 CCACHE = ENV.fetch("CCACHE", "1") == "0" ? "0" : "1"
 
+# The Ruby program's directory, whose main.rb is the entry point: PROJECT
+# (relative to where rake was run), or lib/
+def ruby_project
+  dir = File.expand_path(ENV["PROJECT"].to_s.empty? ? File.join(__dir__, "lib") : ENV["PROJECT"], Rake.original_dir)
+  File.file?(File.join(dir, "main.rb")) or abort "#{dir} has no main.rb; PROJECT names a directory with one"
+  dir
+end
+
+# A project outside this checkout is mounted at its own path under
+# /ruby-project, so a switch to another one changes the entry point and the
+# build compiles it again (the same mount for both would leave the first's
+# C in place when the second's files are older).
+def outside_mount
+  "/ruby-project#{ruby_project}"
+end
+
+def outside_project?
+  !ruby_project.start_with?("#{__dir__}/")
+end
+
+# The entry point as the container sees it
+def ruby_main
+  return "#{outside_mount}/main.rb" if outside_project?
+
+  File.join(ruby_project.delete_prefix("#{__dir__}/"), "main.rb")
+end
+
 def container(*cmd)
   tty = $stdin.tty? ? ["-it"] : []
+  mounts = ["-v", "#{__dir__}:/project"]
+  mounts += ["-v", "#{ruby_project}:#{outside_mount}"] if outside_project?
   sh "docker", "run", "--rm", *tty,
      "--user", "#{Process.uid}:#{Process.gid}", "-e", "HOME=/tmp",
      "-e", "IDF_CCACHE_ENABLE=#{CCACHE}", "-e", "CCACHE_DIR=/project/.ccache",
-     "-v", "#{__dir__}:/project", "-w", "/project",
+     *mounts, "-w", "/project",
      IMAGE, *cmd
 end
 
@@ -37,11 +66,11 @@ task "set-target", [:target] do |_, args|
   set_target name
 end
 
-desc "Build the firmware (TARGET=<soc> switches the target first)"
+desc "Build the firmware (PROJECT=<dir> builds <dir>/main.rb in place of lib/main.rb; TARGET=<soc> switches the target first)"
 task :build do
   wanted = ENV["TARGET"]
   set_target wanted if wanted && wanted != configured_target
-  container "idf.py", "build"
+  container "idf.py", "-DESPINEL_MAIN=#{ruby_main}", "build"
 end
 
 desc "Remove the build directory"
@@ -120,9 +149,9 @@ task :menuconfig do
   container "idf.py", "menuconfig"
 end
 
-desc "Print the C that Spinel generates for lib/main.rb"
+desc "Print the C that Spinel generates for lib/main.rb (or PROJECT=<dir>)"
 task :c do
-  container "spinel", "-I", "packages", "lib/main.rb", "-S"
+  container "spinel", "-I", "packages", ruby_main, "-S"
 end
 
 desc "Decode backtrace addresses: rake addr2line ADDRS='0x4200760a 0x4202c085'"

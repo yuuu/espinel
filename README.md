@@ -61,6 +61,29 @@ The Ruby program starts at `lib/main.rb`, the fixed entry point. Other files
 under `lib/` are pulled in with `require_relative`. Edit them and run
 `rake qemu` again.
 
+## Examples
+
+`examples/<name>/` are programs ready to run on a Seeed Studio XIAO
+ESP32S3. `PROJECT=<dir>` builds `<dir>/main.rb` in place of `lib/main.rb`,
+for `rake build`, `qemu`, `flash` and `c`:
+
+```sh
+bundle exec rake set-target TARGET=esp32s3   # once
+bundle exec rake flash monitor PROJECT=examples/blink
+```
+
+The directory can be one of your own, anywhere (relative to where rake
+runs): a `main.rb` and the files it `require_relative`s. One outside this
+checkout is mounted into the container. `require "<package>"` still finds
+`packages/`.
+
+| Example | |
+|---|---|
+| `blink` | blinks the board's own LED (GPIO21); nothing to wire |
+| `hello` | plain Ruby (a class, blocks, Hashes, an exception) and `Memory.report`; also runs under QEMU |
+
+A build without `PROJECT` goes back to `lib/main.rb`.
+
 ## Packages
 
 `require "<name>"` loads `packages/<name>/<name>.rb`, laid out as a spin
