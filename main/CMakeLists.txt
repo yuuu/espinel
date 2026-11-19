@@ -1,11 +1,13 @@
-# The Ruby program, whose entry point is always lib/main.rb, is compiled to
-# C by the host Spinel at build time. Its `main` is renamed spinel_main and
-# called from the Ruby task (main.c).
+# The Ruby program, whose entry point is lib/main.rb or the ESPINEL_MAIN
+# given (`rake build PROJECT=<dir>` passes <dir>/main.rb), is
+# compiled to C by the host Spinel at build time. Its `main` is renamed
+# spinel_main and called from the Ruby task (main.c).
 # (`--ext-init`, which emits a library entry instead, does not compile for
 # a program this small: spinel_rt.h's SP_TU_NO_POLY_RENDER fallbacks clash
 # with the ext kernel's extern declarations, on any host.)
-set(RUBY_LIB ${CMAKE_CURRENT_LIST_DIR}/../lib)
-set(RUBY_MAIN ${RUBY_LIB}/main.rb)
+set(ESPINEL_MAIN "lib/main.rb" CACHE STRING "The Ruby program's entry point, absolute or relative to this project")
+get_filename_component(RUBY_MAIN ${ESPINEL_MAIN} ABSOLUTE BASE_DIR ${CMAKE_CURRENT_LIST_DIR}/..)
+get_filename_component(RUBY_LIB ${RUBY_MAIN} DIRECTORY)
 set(RUBY_C ${CMAKE_CURRENT_BINARY_DIR}/main_rb.c)
 # Packages under packages/<name>/<name>.rb resolve `require "<name>"`
 # (spinel -I packages); the C they carry is compiled here.
@@ -36,8 +38,9 @@ if(CMAKE_BUILD_EARLY_EXPANSION)
   return()
 endif()
 
-# Every .rb under lib/: main.rb splices in what it require_relative's, so a
-# change to any of them recompiles the program.
+# Every .rb beside the entry point (under lib/, or the project's directory):
+# it splices in what it require_relative's, so a change to any of them
+# recompiles the program.
 file(GLOB_RECURSE RUBY_SRCS CONFIGURE_DEPENDS ${RUBY_LIB}/*.rb ${RUBY_PACKAGES}/*.rb)
 
 # --cc names the target compiler so Spinel classifies integer literals for
@@ -52,7 +55,7 @@ add_custom_command(
   # src/codegen.c emits the NULL; nothing calls through an empty table.
   COMMAND sed -i "s/^\\(static const char \\*(\\*const sp_insp_fn\\[\\])(void \\*, const uint8_t \\*) = {\\) NULL };$/\\1 sp_esp_insp_none };/" ${RUBY_C}
   DEPENDS ${RUBY_SRCS}
-  COMMENT "Spinel: compiling lib/main.rb to C"
+  COMMENT "Spinel: compiling ${ESPINEL_MAIN} to C"
   VERBATIM)
 
 # Generated C: Spinel's own warning policy (-Wno-all), not ESP-IDF's -Werror.

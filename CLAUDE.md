@@ -34,8 +34,17 @@ kept in a separate work log, not in this repository.
   built from the `spinel` build context (with the prism gem, which Spinel's
   build runs Ruby generators with, and `make deps`). Sets
   `SPINEL_DIR=/opt/spinel` and puts `spinel` on `PATH`.
-- `lib/main.rb`: the Ruby entry point (fixed). Other files in `lib/` are
+- `lib/main.rb`: the Ruby entry point by default. Other files in `lib/` are
   reached with `require_relative`, which Spinel resolves at compile time.
+- `examples/<name>/main.rb`: published programs for the XIAO ESP32S3. List
+  each in README.md.
+- `PROJECT=<dir>` (any directory with a `main.rb`, `examples/<name>` or
+  the user's own) makes `<dir>/main.rb` the entry point: the Rakefile passes
+  it to `idf.py` as `-DESPINEL_MAIN=` on every build (`lib/main.rb` without
+  it), so the cached value never outlives the call. A directory outside the
+  checkout is mounted at `/ruby-project<its host path>` in the container,
+  so two of them never share an entry point (ninja would keep the first's
+  C when the second's files are older).
 - `packages/<name>/`: spin-package layout (`<name>.rb`, `spin.toml`, carried
   `.c`). `require "<name>"` finds them through `spinel -I packages`; their
   `.c` files are compiled into the `main` component, whose `PRIV_REQUIRES`
@@ -49,7 +58,7 @@ kept in a separate work log, not in this repository.
   A feature with a slash resolves to `packages/<dir>/<name>/<name>.rb`
   (`require "net/mqtt"`: `packages/net/mqtt/mqtt.rb`); Spinel's own
   `net/http` is still found, as `-I` is searched file by file.
-- `main/`: compiles `lib/main.rb` to C at build time
+- `main/`: compiles the entry point (`ESPINEL_MAIN`) to C at build time
   (`spinel -I packages ... -c --cc=<target gcc>`). The generated `main` is renamed with
   `-Dmain=spinel_main`, and `main.c` calls it from a FreeRTOS task with a
   32 KB stack (the main task's 3.5 KB is too small).
