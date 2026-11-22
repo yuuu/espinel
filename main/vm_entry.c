@@ -25,7 +25,7 @@
      another VM's garbage holds the room, and Spinel ends the program on a
      failed allocation (sp_oom_die) without collecting. Here a failure asks
      every VM, this one too, to collect at its next allocation
-     (main.c), and tries again for a while before it fails.
+     (packages/task), and tries again for a while before it fails.
 
    When the program has ended, its objects are freed: its roots are
    dropped and the collector runs until it has swept the old generation
@@ -39,7 +39,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_random.h"
-#include "espinel_vm.h"
+#include "espinel_task.h"
 
 #ifndef ESPINEL_VM_RUN
 #error "ESPINEL_VM_RUN names this VM's entry (main/CMakeLists.txt)"
@@ -105,7 +105,7 @@ void exit(int status) {
 #define VM_ALLOC_RETRY_STEP_MS 10
 
 static void *alloc_again(void *ptr, size_t n) {
-  espinel_vm_pressure();
+  espinel_task_pressure();
   for (int waited = 0; waited < VM_ALLOC_RETRY_MS; waited += VM_ALLOC_RETRY_STEP_MS) {
     vTaskDelay(pdMS_TO_TICKS(VM_ALLOC_RETRY_STEP_MS) ? pdMS_TO_TICKS(VM_ALLOC_RETRY_STEP_MS) : 1);
     void *p = ptr ? heap_caps_realloc_default(ptr, n) : heap_caps_malloc_default(n);
@@ -152,7 +152,7 @@ int ESPINEL_VM_RUN(const char *name, unsigned stack_size) {
   sp_esp_stack_check_init();
 #endif
   vm_task = xTaskGetCurrentTaskHandle();
-  espinel_vm_attach(&sp_gc_threshold);
+  espinel_task_attach(&sp_gc_threshold);
   if (setjmp(vm_exit) == 0) {
     rc = spinel_main(1, argv);
     /* a C program's return from main runs the handlers too */

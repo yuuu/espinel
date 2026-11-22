@@ -74,19 +74,19 @@ kept in a separate work log, not in this repository.
   local but `espinel_vm_<name>_run` (`objcopy --keep-global-symbol`). So
   each VM has its own copy of Spinel's globals and runs on its own FreeRTOS
   task at once with the others. The generated `main` is renamed with
-  `-Dmain=spinel_main`. `main.c` keeps the table of VMs (`vm_table.c`,
-  generated; its C API is `espinel_vm.h`) and starts "main" with a 32 KB
-  stack (the main task's 3.5 KB is too small); the others start from Ruby,
-  through `packages/task`, which defines every function `task.rb` calls
-  (`espinel_task_*`) on top of that API.
+  `-Dmain=spinel_main`. The table of VMs (`vm_table.c`, generated) is
+  kept by `packages/task/task.c`, which every firmware links whether a
+  program requires `task` or not: `main.c` only sets the console up and
+  starts "main" through it with a 32 KB stack (the main task's 3.5 KB is
+  too small); the others start from Ruby (`Task.new`).
   - `vm_entry.c` (each VM's) takes over what the C library keeps for the
     whole process: `atexit`, `exit` and `_exit` (a VM's exit runs its own
     handlers and returns from its run function), and `malloc`/`calloc`/
     `realloc`, which on failure ask every VM to collect at its next
-    allocation (`espinel_vm_pressure` lowers their `sp_gc_threshold`) and
+    allocation (`espinel_task_pressure` lowers their `sp_gc_threshold`) and
     try again for a second. After the program ends it drops the roots and
     collects until a full cycle has run, freeing the program's objects.
-  - Code linked once for the whole firmware (`main.c`, `port/sp_esp.c`,
+  - Code linked once for the whole firmware (`task.c`, `port/sp_esp.c`,
     the shared packages' C) must keep no state of one Ruby task's in a
     static: two VMs call it at once (`nanosleep` keeps its timer and
     semaphore in `__thread`).

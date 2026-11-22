@@ -16,8 +16,8 @@
 #   q.push("21.5")                    # in one
 #   q.pop                             # => "21.5", in the other
 #
-# The C half is task.c (linked once, over main/main.c's table of VMs) and
-# task_vm.c (each VM's) in this package.
+# The C half is task.c, linked once, which keeps the table of VMs (main.c
+# starts the main program through it), and task_vm.c, each VM's.
 module ESPTask
   ffi_func :espinel_task_find, [:str], :int
   ffi_func :espinel_task_start, [:int, :int, :int, :int], :int
@@ -37,7 +37,7 @@ module ESPTask
 end
 
 class Task
-  # the VM states (main/espinel_vm.h)
+  # the VM states (espinel_task.h)
   IDLE = 0
   RUNNING = 1
   FINISHED = 2

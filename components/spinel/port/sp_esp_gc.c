@@ -22,8 +22,8 @@
 extern size_t sp_gc_threshold, sp_gc_threshold_init, sp_gc_bytes;
 extern void (*sp_gc_obj_retune_hook)(size_t before);
 void sp_gc_retune_object(size_t before);
-/* main/main.c */
-unsigned espinel_vm_running(void);
+/* how many Ruby VMs are running (packages/task/task.c) */
+unsigned espinel_task_running(void);
 
 #define SP_ESP_GC_FLOOR   (32 * 1024)  /* collect after this much at least */
 #define SP_ESP_GC_RESERVE (32 * 1024)  /* never budgeted: payloads, drivers */
@@ -32,7 +32,7 @@ unsigned espinel_vm_running(void);
 static void sp_esp_gc_retune(size_t before) {
   sp_gc_retune_object(before);
   size_t free_now = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-  unsigned vms = espinel_vm_running();
+  unsigned vms = espinel_task_running();
   size_t room = free_now > SP_ESP_GC_RESERVE
                     ? (free_now - SP_ESP_GC_RESERVE) / 100 * SP_ESP_GC_SHARE / (vms ? vms : 1)
                     : 0;
