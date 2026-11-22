@@ -1,14 +1,52 @@
-/* Named queues between the Ruby VMs (task.rb's Task::Queue): the process's
-   one table, which every VM reaches by name. A message is a copy of a
-   String's bytes, malloc'd by the sender and freed by the receiver
-   (task_vm.c), so no VM ever holds another's object. FreeRTOS queues of
-   message pointers carry them. */
+/* The C half of task.rb, linked once for the whole firmware.
+
+   Task: the Ruby face of the table of VMs (main/main.c, espinel_vm.h).
+
+   Task::Queue: named queues between the VMs, the process's one table,
+   which every VM reaches by name. A message is a copy of a String's
+   bytes, malloc'd by the sender and freed by the receiver (task_vm.c), so
+   no VM ever holds another's object. FreeRTOS queues of message pointers
+   carry them. */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/task.h"
+#include "espinel_vm.h"
 #include "espinel_task.h"
+
+/* Task */
+
+/* the VM called name, or -1 */
+int espinel_task_find(const char *name) {
+  int n = espinel_vm_count();
+  for (int i = 0; i < n; i++)
+    if (strcmp(espinel_vm_name(i), name) == 0) return i;
+  return -1;
+}
+
+/* see espinel_vm.h for these */
+int espinel_task_start(int id, int core, int priority, int stack_size) {
+  return espinel_vm_start(id, core, priority, stack_size);
+}
+
+int espinel_task_wait(int id, int timeout_ms) { return espinel_vm_wait(id, timeout_ms); }
+
+int espinel_task_state(int id) { return espinel_vm_state(id); }
+
+int espinel_task_status(int id) { return espinel_vm_status(id); }
+
+int espinel_task_self(void) { return espinel_vm_self(); }
+
+int espinel_task_count(void) { return espinel_vm_count(); }
+
+const char *espinel_task_name(int id) { return espinel_vm_name(id); }
+
+/* the core the calling task is on now (an unpinned task can move) */
+int espinel_task_core(void) { return (int)xPortGetCoreID(); }
+
+/* Task::Queue */
 
 #define QUEUE_MAX 8
 #define QUEUE_NAME_MAX 24

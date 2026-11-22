@@ -8,6 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "espinel_vm.h"
 
 /* The Ruby VMs this firmware carries: the entry point, "main", first, then
    one for each tasks/<name>.rb beside it. Each is a Ruby program with a
@@ -25,8 +26,6 @@ extern const int espinel_vm_def_count;
 #define MAIN_VM_STACK_SIZE (32 * 1024)
 #define MAIN_VM_PRIORITY 5
 
-enum { VM_IDLE, VM_RUNNING, VM_FINISHED };
-
 typedef struct {
   TaskHandle_t task;
   size_t *gc_threshold;     /* the VM's collection trigger (vm_entry.c) */
@@ -40,7 +39,8 @@ static vm_slot *slots;
 static unsigned running;
 static portMUX_TYPE slots_lock = portMUX_INITIALIZER_UNLOCKED;
 
-/* how many VMs are running (the GC shares the heap out among them) */
+/* the API, espinel_vm.h */
+
 unsigned espinel_vm_running(void) { return running; }
 
 int espinel_vm_count(void) { return espinel_vm_def_count; }
@@ -49,48 +49,30 @@ const char *espinel_vm_name(int id) {
   return id >= 0 && id < espinel_vm_def_count ? espinel_vm_defs[id].name : "";
 }
 
-int espinel_vm_find(const char *name) {
-  for (int i = 0; i < espinel_vm_def_count; i++)
-    if (strcmp(espinel_vm_defs[i].name, name) == 0) return i;
-  return -1;
-}
-
-/* the VM running on the calling task, or -1 */
 int espinel_vm_self(void) {
   TaskHandle_t me = xTaskGetCurrentTaskHandle();
   for (int i = 0; i < espinel_vm_def_count; i++)
-    if (slots[i].task == me && slots[i].state == VM_RUNNING) return i;
+    if (slots[i].task == me && slots[i].state == ESPINEL_VM_RUNNING) return i;
   return -1;
 }
 
-/* Every VM collects at its next allocation: the heap is short (a VM's
-   malloc failed), or the VMs running have changed and each should share
-   the room out again (sp_esp_gc.c). A VM blocked in a wait collects
-   when it next allocates. */
 void espinel_vm_pressure(void) {
   for (int i = 0; i < espinel_vm_def_count; i++) {
     size_t *t = slots[i].gc_threshold;
-    if (t && slots[i].state == VM_RUNNING) *t = 0;
+    if (t && slots[i].state == ESPINEL_VM_RUNNING) *t = 0;
   }
 }
 
-/* A VM's runtime, starting, says where its trigger is; the others then
-   share the room out among one more. */
 void espinel_vm_attach(size_t *gc_threshold) {
   int id = espinel_vm_self();
   espinel_vm_pressure();
   if (id >= 0) slots[id].gc_threshold = gc_threshold;
 }
 
-/* the core the calling task is on now (an unpinned task can move) */
-int espinel_vm_core(void) { return (int)xPortGetCoreID(); }
-
-/* VM_IDLE (never started), VM_RUNNING or VM_FINISHED */
 int espinel_vm_state(int id) {
   return id >= 0 && id < espinel_vm_def_count ? slots[id].state : -1;
 }
 
-/* the exit status of a finished VM */
 int espinel_vm_status(int id) {
   return id >= 0 && id < espinel_vm_def_count ? slots[id].status : -1;
 }
@@ -111,7 +93,7 @@ static void vm_task(void *arg) {
   fflush(stdout);
   taskENTER_CRITICAL(&slots_lock);
   s->status = rc;
-  s->state = VM_FINISHED;
+  s->state = ESPINEL_VM_FINISHED;
   s->task = NULL;
   s->gc_threshold = NULL;
   running--;
@@ -120,9 +102,6 @@ static void vm_task(void *arg) {
   vTaskDelete(NULL);
 }
 
-/* Starts VM id on a task of its own: on core 0 or 1, or either (-1). A VM
-   runs once a boot, since Spinel's state is not reset. Answers 0, or
-   -1 no such VM, -2 started before, -3 no such core, -4 out of memory. */
 int espinel_vm_start(int id, int core, int priority, int stack_size) {
   if (id < 0 || id >= espinel_vm_def_count) return -1;
   if (core < -1 || core >= portNUM_PROCESSORS) return -3;
@@ -131,19 +110,19 @@ int espinel_vm_start(int id, int core, int priority, int stack_size) {
   vm_slot *s = &slots[id];
   taskENTER_CRITICAL(&slots_lock);
   int was = s->state;
-  if (was == VM_IDLE) {
-    s->state = VM_RUNNING;
+  if (was == ESPINEL_VM_IDLE) {
+    s->state = ESPINEL_VM_RUNNING;
     running++;
   }
   taskEXIT_CRITICAL(&slots_lock);
-  if (was != VM_IDLE) return -2;
+  if (was != ESPINEL_VM_IDLE) return -2;
   s->stack_size = (unsigned)stack_size;
   BaseType_t ok = xTaskCreatePinnedToCore(vm_task, espinel_vm_defs[id].name, (uint32_t)stack_size,
                                           (void *)(intptr_t)id, (UBaseType_t)priority, NULL,
                                           core < 0 ? tskNO_AFFINITY : (BaseType_t)core);
   if (ok != pdPASS) {
     taskENTER_CRITICAL(&slots_lock);
-    s->state = VM_IDLE;
+    s->state = ESPINEL_VM_IDLE;
     running--;
     taskEXIT_CRITICAL(&slots_lock);
     return -4;
@@ -151,14 +130,11 @@ int espinel_vm_start(int id, int core, int priority, int stack_size) {
   return 0;
 }
 
-/* Waits for VM id to finish, timeout_ms at most (-1: forever). Answers 1
-   when it has finished, 0 when the time ran out, -1 when it never
-   started, -2 when it is the calling VM itself. */
 int espinel_vm_wait(int id, int timeout_ms) {
   if (id < 0 || id >= espinel_vm_def_count) return -1;
   vm_slot *s = &slots[id];
-  if (s->state == VM_IDLE) return -1;
-  if (s->state == VM_FINISHED) return 1;
+  if (s->state == ESPINEL_VM_IDLE) return -1;
+  if (s->state == ESPINEL_VM_FINISHED) return 1;
   if (s->task == xTaskGetCurrentTaskHandle()) return -2;
   TickType_t ticks = timeout_ms < 0 ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
   if (xSemaphoreTake(s->done, ticks) != pdTRUE) return 0;

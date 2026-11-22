@@ -16,18 +16,18 @@
 #   q.push("21.5")                    # in one
 #   q.pop                             # => "21.5", in the other
 #
-# The C halves are main/main.c, which keeps the table of VMs, and task.c
-# and task_vm.c in this package.
+# The C half is task.c (linked once, over main/main.c's table of VMs) and
+# task_vm.c (each VM's) in this package.
 module ESPTask
-  ffi_func :espinel_vm_find, [:str], :int
-  ffi_func :espinel_vm_start, [:int, :int, :int, :int], :int
-  ffi_func :espinel_vm_wait, [:int, :int], :int
-  ffi_func :espinel_vm_state, [:int], :int
-  ffi_func :espinel_vm_status, [:int], :int
-  ffi_func :espinel_vm_self, [], :int
-  ffi_func :espinel_vm_count, [], :int
-  ffi_func :espinel_vm_name, [:int], :str
-  ffi_func :espinel_vm_core, [], :int
+  ffi_func :espinel_task_find, [:str], :int
+  ffi_func :espinel_task_start, [:int, :int, :int, :int], :int
+  ffi_func :espinel_task_wait, [:int, :int], :int
+  ffi_func :espinel_task_state, [:int], :int
+  ffi_func :espinel_task_status, [:int], :int
+  ffi_func :espinel_task_self, [], :int
+  ffi_func :espinel_task_count, [], :int
+  ffi_func :espinel_task_name, [:int], :str
+  ffi_func :espinel_task_core, [], :int
   ffi_func :espinel_queue_open, [:str, :int], :int
   ffi_func :espinel_queue_send, [:int, :str, :size_t, :int, :int], :int
   ffi_func :espinel_queue_receive, [:int, :int], :binstr
@@ -37,7 +37,7 @@ module ESPTask
 end
 
 class Task
-  # main.c's VM states
+  # the VM states (main/espinel_vm.h)
   IDLE = 0
   RUNNING = 1
   FINISHED = 2
@@ -53,9 +53,9 @@ class Task
   # raises ArgumentError.
   def initialize(name, core: nil, priority: 5, stack_size: STACK_SIZE)
     @name = name.to_s
-    @id = ESPTask.espinel_vm_find(@name)
+    @id = ESPTask.espinel_task_find(@name)
     raise ArgumentError, "no task named #{@name} (tasks/#{@name}.rb)" if @id < 0
-    rc = ESPTask.espinel_vm_start(@id, core.nil? ? -1 : core, priority, stack_size)
+    rc = ESPTask.espinel_task_start(@id, core.nil? ? -1 : core, priority, stack_size)
     raise ArgumentError, "task #{@name} has run already (once a boot)" if rc == -2
     raise ArgumentError, "no core #{core}" if rc == -3
     raise NoMemoryError, "no memory for task #{@name}'s #{stack_size}-byte stack" if rc == -4
@@ -65,7 +65,7 @@ class Task
   # when nil). Answers self, or nil when the time ran out.
   def join(timeout = nil)
     ms = timeout.nil? ? -1 : (timeout * 1000).to_i
-    rc = ESPTask.espinel_vm_wait(@id, ms)
+    rc = ESPTask.espinel_task_wait(@id, ms)
     raise ThreadError, "task #{@name} cannot join itself" if rc == -2
     rc == 1 ? self : nil
   end
@@ -73,16 +73,16 @@ class Task
   # The program's exit status, waiting for it to end
   def value
     join
-    ESPTask.espinel_vm_status(@id)
+    ESPTask.espinel_task_status(@id)
   end
 
   def alive?
-    ESPTask.espinel_vm_state(@id) == RUNNING
+    ESPTask.espinel_task_state(@id) == RUNNING
   end
 
   # "run" or "finished"
   def status
-    ESPTask.espinel_vm_state(@id) == RUNNING ? "run" : "finished"
+    ESPTask.espinel_task_state(@id) == RUNNING ? "run" : "finished"
   end
 
   def inspect
@@ -95,18 +95,18 @@ class Task
 
   # The name of the program running here: "main" for the entry point
   def self.current
-    ESPTask.espinel_vm_name(ESPTask.espinel_vm_self)
+    ESPTask.espinel_task_name(ESPTask.espinel_task_self)
   end
 
   # The core the program runs on now, 0 or 1 (one not pinned can move)
   def self.core
-    ESPTask.espinel_vm_core
+    ESPTask.espinel_task_core
   end
 
   # The names of every program built in, "main" first
   def self.list
     names = []
-    ESPTask.espinel_vm_count.times { |i| names << ESPTask.espinel_vm_name(i) }
+    ESPTask.espinel_task_count.times { |i| names << ESPTask.espinel_task_name(i) }
     names
   end
 

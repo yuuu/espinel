@@ -75,8 +75,10 @@ kept in a separate work log, not in this repository.
   each VM has its own copy of Spinel's globals and runs on its own FreeRTOS
   task at once with the others. The generated `main` is renamed with
   `-Dmain=spinel_main`. `main.c` keeps the table of VMs (`vm_table.c`,
-  generated) and starts "main" with a 32 KB stack (the main task's 3.5 KB
-  is too small); the others start from Ruby.
+  generated; its C API is `espinel_vm.h`) and starts "main" with a 32 KB
+  stack (the main task's 3.5 KB is too small); the others start from Ruby,
+  through `packages/task`, which defines every function `task.rb` calls
+  (`espinel_task_*`) on top of that API.
   - `vm_entry.c` (each VM's) takes over what the C library keeps for the
     whole process: `atexit`, `exit` and `_exit` (a VM's exit runs its own
     handlers and returns from its run function), and `malloc`/`calloc`/

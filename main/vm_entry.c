@@ -39,6 +39,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_random.h"
+#include "espinel_vm.h"
 
 #ifndef ESPINEL_VM_RUN
 #error "ESPINEL_VM_RUN names this VM's entry (main/CMakeLists.txt)"
@@ -57,10 +58,6 @@ extern size_t sp_gc_threshold;
 extern int sp_gc_nroots;
 extern unsigned long long sp_gc_stat_fulls;
 void sp_gc_collect(void);
-/* main.c: this VM's collection trigger, which other VMs lower; and the
-   request to every VM to collect */
-void espinel_vm_attach(size_t *gc_threshold);
-void espinel_vm_pressure(void);
 /* what the C library's malloc and realloc are (ESP-IDF's heap) */
 void *heap_caps_malloc_default(size_t size);
 void *heap_caps_realloc_default(void *ptr, size_t size);

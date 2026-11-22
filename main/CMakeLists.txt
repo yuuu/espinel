@@ -94,7 +94,9 @@ const int espinel_vm_def_count = ${vm_count};
 ")
 set_source_files_properties(${VM_OBJS} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 
+# espinel_vm.h, the table's API, is for the packages' C too
 idf_component_register(SRCS "main.c" ${VM_TABLE_C} ${VM_OBJS} ${SHARED_PACKAGE_C_SRCS}
+                       PRIV_INCLUDE_DIRS "."
                        PRIV_REQUIRES ${MAIN_REQUIRES})
 
 # What every VM takes its own copy of besides the runtime (espinel_rt in
