@@ -168,16 +168,17 @@ int gethostname(char *name, size_t len) {
    task on an esp_timer one-shot, so other tasks get the CPU and the wake-up
    comes at the microsecond asked for, not at a tick. (ESP-IDF's usleep
    busy-waits whatever is under a tick, with a CPU-cycle count that QEMU
-   runs about 4x long.) Only the Ruby task sleeps here, so one timer and
-   one semaphore serve every call. */
+   runs about 4x long.) Every VM's task sleeps here, so each task keeps a
+   timer and a semaphore of its own, in thread-local storage, made at its
+   first sleep. */
 static void sp_esp_sleep_wake(void *sem) { xSemaphoreGive((SemaphoreHandle_t)sem); }
 int nanosleep(const struct timespec *req, struct timespec *rem) {
   if (!req || req->tv_sec < 0 || req->tv_nsec < 0 || req->tv_nsec >= 1000000000L) {
     errno = EINVAL;
     return -1;
   }
-  static SemaphoreHandle_t sem;
-  static esp_timer_handle_t timer;
+  static __thread SemaphoreHandle_t sem;
+  static __thread esp_timer_handle_t timer;
   if (!timer) {
     sem = xSemaphoreCreateBinary();
     esp_timer_create_args_t args = { .callback = sp_esp_sleep_wake, .arg = sem, .name = "sleep" };

@@ -1,62 +1,116 @@
-# The Ruby program, whose entry point is lib/main.rb or the ESPINEL_MAIN
-# given (`rake build PROJECT=<dir>` passes <dir>/main.rb), is
-# compiled to C by the host Spinel at build time. Its `main` is renamed
-# spinel_main and called from the Ruby task (main.c).
-# (`--ext-init`, which emits a library entry instead, does not compile for
-# a program this small: spinel_rt.h's SP_TU_NO_POLY_RENDER fallbacks clash
-# with the ext kernel's extern declarations, on any host.)
+# The Ruby programs, each compiled to C by the host Spinel at build time and
+# linked with a copy of Spinel's runtime of its own into one object, a VM:
+#
+# - "main": the entry point, lib/main.rb or the ESPINEL_MAIN given
+#   (`rake build PROJECT=<dir>` passes <dir>/main.rb). main.c starts it.
+# - one for each tasks/<name>.rb beside the entry point, started by the
+#   program (packages/task).
+#
+# (`--ext-init`, which emits a library entry instead of main, does not
+# compile for a program this small: spinel_rt.h's SP_TU_NO_POLY_RENDER
+# fallbacks clash with the ext kernel's extern declarations, on any host.
+# The generated main is renamed spinel_main instead.)
 set(ESPINEL_MAIN "lib/main.rb" CACHE STRING "The Ruby program's entry point, absolute or relative to this project")
 get_filename_component(RUBY_MAIN ${ESPINEL_MAIN} ABSOLUTE BASE_DIR ${CMAKE_CURRENT_LIST_DIR}/..)
 get_filename_component(RUBY_LIB ${RUBY_MAIN} DIRECTORY)
-set(RUBY_C ${CMAKE_CURRENT_BINARY_DIR}/main_rb.c)
 # Packages under packages/<name>/<name>.rb resolve `require "<name>"`
 # (spinel -I packages); the C they carry is compiled here.
 set(RUBY_PACKAGES ${CMAKE_CURRENT_LIST_DIR}/../packages)
-file(GLOB PACKAGE_C_SRCS ${RUBY_PACKAGES}/*/*.c)
+
+set(MAIN_REQUIRES spinel esp_driver_gpio esp_driver_uart
+                  esp_driver_i2c esp_driver_spi esp_driver_ledc
+                  esp_netif esp_event esp_wifi esp_eth nvs_flash esp_timer
+                  mbedtls)
+
+# ESP-IDF first reads this file in script mode, only for the requirements;
+# the rest is for the real configure.
+if(CMAKE_BUILD_EARLY_EXPANSION)
+  idf_component_register(PRIV_REQUIRES ${MAIN_REQUIRES})
+  return()
+endif()
+
+# The VMs: names and entry points
+set(VM_NAMES main)
+set(VM_main_RB ${RUBY_MAIN})
+file(GLOB TASK_RBS CONFIGURE_DEPENDS ${RUBY_LIB}/tasks/*.rb)
+list(SORT TASK_RBS)
+foreach(rb ${TASK_RBS})
+  get_filename_component(name ${rb} NAME_WE)
+  if(NOT name MATCHES "^[a-z_][a-z0-9_]*$" OR name STREQUAL "main")
+    message(FATAL_ERROR "${rb}: a task's file name must be a lowercase identifier other than main")
+  endif()
+  list(APPEND VM_NAMES ${name})
+  set(VM_${name}_RB ${rb})
+endforeach()
+
+# A package's C is either the process's, one copy that every VM calls (it
+# calls nothing of Spinel's, and the state it keeps -- a driver set up, the
+# network, the queues between VMs -- is the whole firmware's), or each VM's, linked into every VM that uses it, when
+# it reads or sets Spinel's own state (sp_gc_bytes, or sp_ffi_bin_len for a
+# :binstr return) or keeps what one program asked for until its next call
+# (mbedtls's and ssl_socket's result buffers, ssl_socket's sessions). The
+# latter are listed here.
+set(VM_LOCAL_PACKAGE_C memory/memory.c task/task_vm.c mbedtls/mbedtls.c ssl_socket/ssl_socket.c)
+file(GLOB PACKAGE_C_SRCS ${RUBY_PACKAGES}/*/*.c ${RUBY_PACKAGES}/*/*/*.c)
+set(SHARED_PACKAGE_C_SRCS)
+set(VM_PACKAGE_C_SRCS)
+foreach(c ${PACKAGE_C_SRCS})
+  file(RELATIVE_PATH rel ${RUBY_PACKAGES} ${c})
+  if(rel IN_LIST VM_LOCAL_PACKAGE_C)
+    list(APPEND VM_PACKAGE_C_SRCS ${c})
+  else()
+    list(APPEND SHARED_PACKAGE_C_SRCS ${c})
+  endif()
+endforeach()
+
 # The C that Spinel's own bundled packages carry, for `require "json"` and
-# the like. Spinel's driver links a package's C only when the program
-# requires it (the generated C's SPINEL_LINK_OBJ markers); here all of it is
-# compiled into this component's archive, whose objects the linker takes
-# only when the program refers to them. zlib (libz), openssl, pty, ffi and
-# tmpdir are left out: ESP-IDF has nothing for them to stand on.
+# the like; it calls the runtime, so each VM takes its own. zlib (libz),
+# openssl, pty, ffi and tmpdir are left out: ESP-IDF has nothing for them
+# to stand on.
 set(SPINEL_PACKAGES $ENV{SPINEL_DIR}/packages)
 set(SPINEL_PACKAGE_C_SRCS
   ${SPINEL_PACKAGES}/json/sp_json.c
   ${SPINEL_PACKAGES}/stringio/sp_stringio.c
   ${SPINEL_PACKAGES}/strscan/sp_strscan.c
   ${SPINEL_PACKAGES}/base64/sp_base64.c)
-idf_component_register(SRCS "main.c" "stack_check.c" "${RUBY_C}" ${PACKAGE_C_SRCS} ${SPINEL_PACKAGE_C_SRCS}
-                       PRIV_INCLUDE_DIRS ${SPINEL_PACKAGES}/json ${SPINEL_PACKAGES}/stringio
-                       PRIV_REQUIRES spinel esp_driver_gpio esp_driver_uart
-                                     esp_driver_i2c esp_driver_spi esp_driver_ledc
-                                     esp_netif esp_event esp_wifi esp_eth nvs_flash esp_timer
-                                     mbedtls)
 
-# ESP-IDF first reads this file in script mode, only for the requirements
-# above; the rest is for the real configure.
-if(CMAKE_BUILD_EARLY_EXPANSION)
-  return()
-endif()
+# The table main.c starts the VMs from
+set(VM_TABLE_C ${CMAKE_CURRENT_BINARY_DIR}/vm_table.c)
+set(VM_OBJS)
+set(table_decls "")
+set(table_rows "")
+foreach(vm ${VM_NAMES})
+  list(APPEND VM_OBJS ${CMAKE_CURRENT_BINARY_DIR}/vm_${vm}.o)
+  string(APPEND table_decls "int espinel_vm_${vm}_run(const char *, unsigned);\n")
+  string(APPEND table_rows "  { \"${vm}\", espinel_vm_${vm}_run },\n")
+endforeach()
+list(LENGTH VM_NAMES vm_count)
+file(CONFIGURE OUTPUT ${VM_TABLE_C} CONTENT "/* generated by main/CMakeLists.txt */
+typedef struct { const char *name; int (*run)(const char *, unsigned); } espinel_vm_def;
+${table_decls}
+const espinel_vm_def espinel_vm_defs[] = {
+${table_rows}};
+const int espinel_vm_def_count = ${vm_count};
+")
+set_source_files_properties(${VM_OBJS} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 
-# Every .rb beside the entry point (under lib/, or the project's directory):
-# it splices in what it require_relative's, so a change to any of them
-# recompiles the program.
+idf_component_register(SRCS "main.c" ${VM_TABLE_C} ${VM_OBJS} ${SHARED_PACKAGE_C_SRCS}
+                       PRIV_REQUIRES ${MAIN_REQUIRES})
+
+# What every VM takes its own copy of besides the runtime (espinel_rt in
+# components/spinel): the stack check, the packages that reach into
+# Spinel's state, and Spinel's bundled packages. An archive, so a VM takes
+# only the members its program refers to.
+add_library(espinel_vm_support STATIC stack_check.c ${VM_PACKAGE_C_SRCS} ${SPINEL_PACKAGE_C_SRCS})
+target_link_libraries(espinel_vm_support PRIVATE idf::spinel idf::freertos idf::heap idf::mbedtls idf::esp_timer idf::log)
+target_include_directories(espinel_vm_support PRIVATE ${SPINEL_PACKAGES}/json ${SPINEL_PACKAGES}/stringio)
+# Spinel's packages: Spinel's warning policy, as for the generated C
+set_source_files_properties(${SPINEL_PACKAGE_C_SRCS} PROPERTIES COMPILE_OPTIONS "-O2;-w")
+
+# Every .rb beside the entry point (under lib/, or the project's directory)
+# and in packages/: a program splices in what it require_relative's and
+# requires, so a change to any of them compiles every VM again.
 file(GLOB_RECURSE RUBY_SRCS CONFIGURE_DEPENDS ${RUBY_LIB}/*.rb ${RUBY_PACKAGES}/*.rb)
-
-# --cc names the target compiler so Spinel classifies integer literals for
-# its 32-bit Integer.
-add_custom_command(
-  OUTPUT ${RUBY_C}
-  COMMAND spinel -I ${RUBY_PACKAGES} ${RUBY_MAIN} -c --cc=${CMAKE_C_COMPILER} -o ${RUBY_C}
-  # A program with no ivar inspector gets an inspector table of { NULL }.
-  # GCC folds the call through it into a call to address 0, which the
-  # Xtensa linker refuses ("windowed longcall crosses 1GB boundary"), so the
-  # NULL becomes a stub that is never called (port/sp_esp.c). Spinel's
-  # src/codegen.c emits the NULL; nothing calls through an empty table.
-  COMMAND sed -i "s/^\\(static const char \\*(\\*const sp_insp_fn\\[\\])(void \\*, const uint8_t \\*) = {\\) NULL };$/\\1 sp_esp_insp_none };/" ${RUBY_C}
-  DEPENDS ${RUBY_SRCS}
-  COMMENT "Spinel: compiling ${ESPINEL_MAIN} to C"
-  VERBATIM)
 
 # Generated C: Spinel's own warning policy (-Wno-all), not ESP-IDF's -Werror.
 # With CONFIG_ESPINEL_STACK_CHECK its functions check the stack on entry
@@ -67,8 +121,61 @@ if(CONFIG_ESPINEL_STACK_CHECK)
   list(APPEND RUBY_C_OPTIONS -finstrument-functions
        -finstrument-functions-exclude-file-list=$ENV{SPINEL_DIR}/lib)
 endif()
-set_source_files_properties(${RUBY_C} PROPERTIES COMPILE_OPTIONS "${RUBY_C_OPTIONS}")
 
-# Spinel's packages: Spinel's warning policy, as for the generated C
-set_source_files_properties(${SPINEL_PACKAGE_C_SRCS} PROPERTIES
-  COMPILE_OPTIONS "-O2;-w")
+# The sections a VM's relocatable link keeps apart (see below): code and
+# data, one function or object each. Not the rest: RISC-V's
+# .riscv.attributes, made one section for each input, reads as corrupt.
+set(VM_UNIQUE)
+foreach(sec .text .literal .rodata .data .bss .sdata .sbss .srodata .tbss .tdata)
+  list(APPEND VM_UNIQUE "-Wl,--unique=${sec}.*")
+endforeach()
+
+foreach(vm ${VM_NAMES})
+  set(rb ${VM_${vm}_RB})
+  set(vm_c ${CMAKE_CURRENT_BINARY_DIR}/vm_${vm}.c)
+  # --cc names the target compiler so Spinel classifies integer literals
+  # for its 32-bit Integer.
+  add_custom_command(
+    OUTPUT ${vm_c}
+    COMMAND spinel -I ${RUBY_PACKAGES} ${rb} -c --cc=${CMAKE_C_COMPILER} -o ${vm_c}
+    # A program with no ivar inspector gets an inspector table of { NULL }.
+    # GCC folds the call through it into a call to address 0, which the
+    # Xtensa linker refuses ("windowed longcall crosses 1GB boundary"), so
+    # the NULL becomes a stub that is never called (port/sp_esp.c).
+    # Spinel's src/codegen.c emits the NULL; nothing calls through an empty
+    # table.
+    COMMAND sed -i "s/^\\(static const char \\*(\\*const sp_insp_fn\\[\\])(void \\*, const uint8_t \\*) = {\\) NULL };$/\\1 sp_esp_insp_none };/" ${vm_c}
+    DEPENDS ${RUBY_SRCS}
+    COMMENT "Spinel: compiling ${rb} to C"
+    VERBATIM)
+  set_source_files_properties(${vm_c} PROPERTIES COMPILE_OPTIONS "${RUBY_C_OPTIONS}")
+
+  add_library(espinel_vm_${vm} OBJECT ${vm_c} vm_entry.c)
+  target_link_libraries(espinel_vm_${vm} PRIVATE idf::spinel idf::freertos idf::esp_hw_support)
+  target_compile_definitions(espinel_vm_${vm} PRIVATE ESPINEL_VM_RUN=espinel_vm_${vm}_run)
+
+  # One relocatable object of the VM's C and the runtime members it needs,
+  # with every symbol local but its entry: two VMs' copies of Spinel's
+  # globals and functions never meet, and what they call outside (the C
+  # library, ESP-IDF, the shared packages' C) stays to be resolved by the
+  # firmware's link. --unique keeps each function's and object's section
+  # an output section of its own: a relocatable link otherwise joins the sections of one name,
+  # and the copies of a static function or table from spinel_rt.h that each
+  # object has (.text.sp_String_append, .rodata.re_prop_gc_runs) went into
+  # the firmware together whenever one was used, about 30 KB more than the
+  # --gc-sections of the final link keeps without -r.
+  set(vm_r ${CMAKE_CURRENT_BINARY_DIR}/vm_${vm}_r.o)
+  set(vm_o ${CMAKE_CURRENT_BINARY_DIR}/vm_${vm}.o)
+  add_custom_command(
+    OUTPUT ${vm_o}
+    COMMAND ${CMAKE_C_COMPILER} -nostdlib -r ${VM_UNIQUE} -o ${vm_r}
+            $<TARGET_OBJECTS:espinel_vm_${vm}>
+            -Wl,--start-group $<TARGET_FILE:espinel_vm_support> $<TARGET_FILE:espinel_rt> -Wl,--end-group
+    COMMAND ${CMAKE_OBJCOPY} --keep-global-symbol=espinel_vm_${vm}_run ${vm_r} ${vm_o}
+    DEPENDS espinel_vm_${vm} espinel_vm_support espinel_rt
+            $<TARGET_OBJECTS:espinel_vm_${vm}>
+            $<TARGET_FILE:espinel_vm_support> $<TARGET_FILE:espinel_rt>
+    COMMENT "Linking the Ruby VM ${vm}"
+    COMMAND_EXPAND_LISTS
+    VERBATIM)
+endforeach()

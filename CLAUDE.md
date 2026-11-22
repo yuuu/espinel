@@ -36,6 +36,8 @@ kept in a separate work log, not in this repository.
   `SPINEL_DIR=/opt/spinel` and puts `spinel` on `PATH`.
 - `lib/main.rb`: the Ruby entry point by default. Other files in `lib/` are
   reached with `require_relative`, which Spinel resolves at compile time.
+  `tasks/<name>.rb` beside the entry point are programs of their own,
+  started by `Task.new(:name)` (`packages/task`).
 - `examples/<name>/main.rb`: published programs for the XIAO ESP32S3. List
   each in README.md.
 - `PROJECT=<dir>` (any directory with a `main.rb`, `examples/<name>` or
@@ -51,6 +53,12 @@ kept in a separate work log, not in this repository.
   must list the ESP-IDF components they use. Keep ESP-IDF enums and macros
   on the C side behind plain `int`/`double` functions instead of copying
   values into Ruby.
+  A package's C is linked once for the whole firmware unless it reads or
+  sets Spinel's own state (`sp_gc_bytes`, `sp_ffi_bin_len`) or keeps one
+  program's results between calls (`mbedtls`, `ssl_socket`): those files
+  are listed in `VM_LOCAL_PACKAGE_C` (`main/CMakeLists.txt`), and each VM
+  links its own copy. A VM-local file that is missing from the list shows
+  up as an undefined reference to the runtime's symbol at the final link.
   Peripheral packages follow the mruby / mruby/c peripheral interface guide
   (github.com/mruby/microcontroller-peripheral-interface-guide): its class
   names, methods and keyword parameters. An `esp_err_t` other than `ESP_OK`
@@ -58,13 +66,33 @@ kept in a separate work log, not in this repository.
   A feature with a slash resolves to `packages/<dir>/<name>/<name>.rb`
   (`require "net/mqtt"`: `packages/net/mqtt/mqtt.rb`); Spinel's own
   `net/http` is still found, as `-I` is searched file by file.
-- `main/`: compiles the entry point (`ESPINEL_MAIN`) to C at build time
-  (`spinel -I packages ... -c --cc=<target gcc>`). The generated `main` is renamed with
-  `-Dmain=spinel_main`, and `main.c` calls it from a FreeRTOS task with a
-  32 KB stack (the main task's 3.5 KB is too small).
+- `main/`: compiles every program, the entry point (`ESPINEL_MAIN`) and
+  each `tasks/<name>.rb` beside it, to C at build time (`spinel -I packages
+  ... -c --cc=<target gcc>`), and links each into a VM: one relocatable
+  object (`gcc -r`) of its generated C, `vm_entry.c` and the members of
+  `espinel_rt` and `espinel_vm_support` it needs, with every symbol made
+  local but `espinel_vm_<name>_run` (`objcopy --keep-global-symbol`). So
+  each VM has its own copy of Spinel's globals and runs on its own FreeRTOS
+  task at once with the others. The generated `main` is renamed with
+  `-Dmain=spinel_main`. `main.c` keeps the table of VMs (`vm_table.c`,
+  generated) and starts "main" with a 32 KB stack (the main task's 3.5 KB
+  is too small); the others start from Ruby.
+  - `vm_entry.c` (each VM's) takes over what the C library keeps for the
+    whole process: `atexit`, `exit` and `_exit` (a VM's exit runs its own
+    handlers and returns from its run function), and `malloc`/`calloc`/
+    `realloc`, which on failure ask every VM to collect at its next
+    allocation (`espinel_vm_pressure` lowers their `sp_gc_threshold`) and
+    try again for a second. After the program ends it drops the roots and
+    collects until a full cycle has run, freeing the program's objects.
+  - Code linked once for the whole firmware (`main.c`, `port/sp_esp.c`,
+    the shared packages' C) must keep no state of one Ruby task's in a
+    static: two VMs call it at once (`nanosleep` keeps its timer and
+    semaphore in `__thread`).
 - `components/spinel/`: Spinel's runtime (`RT_MEMBERS` and `RE_SRC` of
   Spinel's Makefile, which the list in `CMakeLists.txt` must mirror),
-  compiled from `$SPINEL_DIR/lib` as it is.
+  compiled from `$SPINEL_DIR/lib` as it is into the archive `espinel_rt`,
+  which the firmware does not link: each VM takes its copy (`main/`). The
+  component itself is the port, linked once.
   - `port/*.h`, `port/sys/*.h`: headers found before the toolchain's. They
     either stand in for a missing header (`sys/mman.h`, `poll.h`,
     `ucontext.h`) or `#include_next` the real one and add what the C
@@ -104,8 +132,7 @@ The model for all of this is Spinel's own wasm32-wasi port
   (`CONFIG_LIBC_NEWLIB` still builds: `port/` keeps both behind
   `#if`). Its `fflush(NULL)` dereferences the NULL, so the spinel
   component links with `--wrap=fflush` and `sp_esp.c` flushes stdout and
-  stderr for it (a File never closed loses its buffer at exit); `exit` in
-  `main.c` runs the `atexit` handlers through `__libc_fini_array`, and
+  stderr for it (a File never closed loses its buffer at exit), and
   `__freadahead` reads a `struct __file_bufio`. `signal` is picolibc's (it
   shares an object with `raise`). termios (`IO#raw`, `IO#noecho`) needs
   `CONFIG_VFS_SUPPORT_TERMIOS`, off by default since v6.0.
@@ -141,8 +168,8 @@ The model for all of this is Spinel's own wasm32-wasi port
   destroyed in the same call. Spinel's `Base64.decode64` answers UTF-8 where CRuby's
   answers ASCII-8BIT, so its result compares unequal to the binary Strings
   the package returns until `.b`.
-- `packages/ssl_socket/`: TLS sessions live in a C table of four, freed
-  by `close` only. They run over the TCPSocket's descriptor with
+- `packages/ssl_socket/`: TLS sessions live in a C table of four (each
+  VM's), freed by `close` only. They run over the TCPSocket's descriptor with
   `send`/`recv`, waiting with `select` (Spinel's sockets are blocking; a
   deadline is waited on before each call). With no CA the config is
   attached to ESP-IDF's certificate bundle; its verify callback refuses a
@@ -171,8 +198,8 @@ The model for all of this is Spinel's own wasm32-wasi port
   the host. A server on the host (a broker started with
   `docker run -p 1883:1883 eclipse-mosquitto`, say) is reached at the
   Docker bridge's gateway, 172.17.0.1 by default.
-- `packages/memory/` reads the Ruby task's stack size from `main.c`
-  (`espinel_ruby_stack_size`) and the `SystemStackError` limit from
+- `packages/memory/` reads the Ruby task's stack size from `vm_entry.c`
+  (`espinel_ruby_stack_size`, each VM's) and the `SystemStackError` limit from
   `stack_check.c`, and Spinel's `sp_gc_bytes`, `sp_gc_threshold` and
   `sp_gc_stat_*` directly. At the top level the program already uses about
   5 KB of stack, and `p`/`inspect` briefly take 4 KB more (`sp_sprintf`).
@@ -194,12 +221,16 @@ The model for all of this is Spinel's own wasm32-wasi port
   (`spinel -I packages ... --link stub.o`).
 - LEDC (the `pwm` package) sets up without an error under QEMU, so the
   timer and channel bookkeeping can be checked there, but not the output.
-- ESP-IDF's `_exit` is `abort()`, a panic and a reboot. `main.c` defines
-  `exit()` to run the `atexit` handlers, flush, and return to the Ruby
-  task, so `exit`, `exit!`, `abort` and an uncaught exception end with
-  `spinel_main returned <status>` and the chip idles. The program is not
-  run again: Spinel's state is not reset.
-- Memory: about 320 KB of free heap with internal RAM only. Spinel's GC
+- ESP-IDF's `_exit` is `abort()`, a panic and a reboot. Each VM's
+  `vm_entry.c` defines `exit()` and `_exit()` to run its `atexit` handlers
+  (not for `_exit`), flush, and return from the VM's run function, so
+  `exit`, `exit!`, `abort` and an uncaught exception end with `spinel_main
+  returned <status>` (`[<name>] spinel_main returned ...` for a task) and
+  the other VMs go on. A VM is not run again: Spinel's state is not reset.
+- Memory: about 320 KB of free heap with internal RAM only. A VM costs
+  its stack plus about 5 KB; about 8 KB stays after it ends. Spinel's
+  objects are large here (500 short Strings in an Array take about 70 KB),
+  so two VMs that both churn can still run out together. Spinel's GC
   thresholds (256 KB each for objects and strings) are sized for a desktop,
   and a failed `malloc`/`realloc` ends the program (`sp_oom_die`) without
   trying a collection first. Objects made by top-level code are not
@@ -223,4 +254,7 @@ The model for all of this is Spinel's own wasm32-wasi port
 - `rake qemu` prints from the ROM banner on, dropping the image's ESP-IDF
   activation output; `rake exec CMD='timeout 15 idf.py qemu </dev/null'`
   shows everything. `idf.py qemu monitor` needs a TTY.
-- To inspect what Spinel generates, use `rake c`.
+- To inspect what Spinel generates, use `rake c` (`TASK=<name>` for a
+  task's program).
+- QEMU runs both cores of the ESP32-S3: an unpinned VM moves between them,
+  and `Task.new(core: 0)` pins one.

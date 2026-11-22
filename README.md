@@ -83,6 +83,7 @@ checkout is mounted into the container. `require "<package>"` still finds
 | `hello` | plain Ruby (a class, blocks, Hashes, an exception) and `Memory.report`; also runs under QEMU |
 | `wifi_https` | joins Wi-Fi and fetches https://example.com/ with the certificate checked; copy `config.example.rb` to `config.rb` (ignored by git) and set the SSID and password first |
 | `aws_iot` | connects to AWS IoT Core over MQTT with TLS and the thing's certificate, publishes telemetry every 10 seconds and prints what arrives on `<thing>/cmd`; set Wi-Fi, the endpoint, the thing's name, certificate and key in `config.rb` (from `config.example.rb`) |
+| `tasks` | two programs at once, one on each core: `main.rb` blinks the board's LED at a steady 5 Hz while `tasks/primes.rb` counts primes flat out on the other core and reports through a `Task::Queue`; also runs under QEMU |
 | `oled` | "Spinel on ESP32" animated on a 128x64 SSD1306 OLED at 0x3C (SDA to D4, SCL to D5): a scan line draws the title, the subtitle types itself, a glint sweeps across; the driver and a 5x7 font are plain Ruby beside it |
 
 A build without `PROJECT` goes back to `lib/main.rb`.
@@ -105,6 +106,7 @@ firmware.
 | `pwm` | `PWM.new(pin, frequency:, duty: 50)` on the LEDC peripheral (without `frequency:` the pin is taken but not started); `frequency(hz)` (0 stops it, low), `period_us(us)`, `duty(percent)`, `pulse_width_us(us)`. One LEDC channel per PWM (8 on the ESP32-S3), at up to four frequencies at once |
 | `spi` | `SPI.new(unit = 2, frequency: 1_000_000, mode: 0, first_bit: SPI::MSB_FIRST, sck_pin:, copi_pin:, cipo_pin:, cs_pin:)`, a controller on SPI2 or SPI3; `cs_pin:` (optional) is driven low for each call. `write(*outputs)` (Integers, Arrays of them, Strings), `read(bytes)` (sends zeros), `transfer(outputs, additional_read_bytes = 0)` answers the bytes clocked in, `setmode(...)` |
 | `ssl_socket` | TLS clients, as in PicoRuby: `SSLSocket.open(host, port, ctx = SSLContext.new)`, or `SSLSocket.new(tcp_socket, ctx)` with `hostname=` and `connect`; `write`, `puts`, `print`, `gets`, `read`, `readpartial`, `eof?`, `close` (`sync_close` also closes the TCP socket, by default), `timeout=`, `cipher`, `ssl_version`, `verify_result`. `SSLContext`: `verify_mode=` (`VERIFY_PEER`, the default, or `VERIFY_NONE`), `set_ca_pem`, `set_cert_pem`, `set_key_pem` |
+| `task` | `Task.new(:name, core: nil, priority: 5, stack_size: 32 * 1024)` starts `tasks/<name>.rb` on a FreeRTOS task of its own (see Tasks); `join(timeout = nil)`, `value` (its exit status), `alive?`; `Task.current`, `Task.core`, `Task.list`. `Task::Queue.new(:name, capacity = 8)` opens a named queue of Strings shared by every program: `push(str, timeout: nil)`, `pop(timeout: nil)` (nil when the time ran out), `size`, `empty?` |
 | `uart` | `UART.new(unit, baudrate: 9600, txd_pin:, rxd_pin:)` (also `data_bits:`, `stop_bits:`, `parity: UART::EVEN or UART::ODD`, `flow_control: UART::RTSCTS` with `rts_pin:`, `cts_pin:`); `write(string)`, `puts`, `read(bytes)` and `gets` (both wait), `bytes_available`, `can_read_line`, `flush`, `clear_rx_buffer`, `send_break(seconds)`, `setmode(...)`. Unit 0 is the console |
 
 ```ruby
@@ -157,6 +159,48 @@ servo = PWM.new(2, frequency: 50)  # XIAO ESP32S3's D1
 servo.pulse_width_us(1500)         # the middle
 led = PWM.new(1, frequency: 1000, duty: 10)
 ```
+
+### Tasks
+
+Every `tasks/<name>.rb` beside the entry point (`lib/tasks/`, or
+`<PROJECT>/tasks/`) is built into the firmware as a program of its own,
+which `Task.new(:name)` starts on a FreeRTOS task of its own. Each program
+is linked with its own copy of Spinel's runtime, so the programs share no
+object, no global and no collector: they run on both cores at once, and an
+exception, `exit` or `SystemStackError` in one ends that one only. They
+talk through `Task::Queue`, named queues of Strings (a message is a copy;
+send anything else as text, JSON say). `require_relative` and `require`
+work in a task as in `main.rb`.
+
+```ruby
+# main.rb
+require "task"
+
+results = Task::Queue.new(:results)
+worker = Task.new(:worker, core: 0)   # tasks/worker.rb
+puts results.pop                      # waits for the worker's first line
+worker.join
+
+# tasks/worker.rb
+require "task"
+
+Task::Queue.new(:results).push("hello from core #{Task.core}")
+```
+
+- A program runs once a boot: Spinel's state is not reset, so a second
+  `Task.new` of the same name raises `ArgumentError`.
+- Each program costs its stack (32 KB unless `stack_size:` says otherwise)
+  and about 5 KB more, out of about 300 KB. When it ends, its objects are
+  freed, but what its globals and constants hold stays.
+- Each program's collector sees only its own objects, and the heap is
+  shared. An allocation that fails asks every program to collect at its
+  next allocation and tries again for a second before the program ends
+  out of memory; a program waiting in `pop` or `sleep` collects only when
+  it next allocates.
+- The peripherals are the firmware's: two programs that both set up the
+  same pin, bus or the network get in each other's way, as two tasks in C
+  would.
+- `rake c TASK=<name>` prints the C of `tasks/<name>.rb`.
 
 ### Networking
 

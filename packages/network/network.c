@@ -64,9 +64,10 @@ static TickType_t ticks_until(int64_t deadline) {
 }
 
 /* address, netmask or gateway (which 0, 1, 2) of an interface with an
-   address; "" otherwise */
+   address; "" otherwise. Every Ruby VM calls this one copy, so the answer
+   is kept per task until the caller has copied it. */
 const char *espinel_net_ipv4(int ifc, int which) {
-  static char buf[16];
+  static __thread char buf[16];
   esp_netif_ip_info_t info;
   buf[0] = '\0';
   if (ifc < 0 || ifc >= IF_COUNT || !netifs[ifc] || !events) return buf;

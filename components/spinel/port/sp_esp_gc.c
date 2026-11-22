@@ -11,7 +11,10 @@
    Strings count here too: with SP_ONE_STRING a String is an object, its
    bytes inline, and the string heap's own budget is never consulted.
 
-   It runs from the Ruby task before spinel_main, after Spinel's
+   Every VM has its own collector (main/vm_entry.c) and draws on the same
+   heap, so the room is shared out among the VMs running.
+
+   It runs from the VM's task before spinel_main, after Spinel's
    constructors have installed the retune hook it wraps. */
 #include <stddef.h>
 #include "esp_heap_caps.h"
@@ -19,6 +22,8 @@
 extern size_t sp_gc_threshold, sp_gc_threshold_init, sp_gc_bytes;
 extern void (*sp_gc_obj_retune_hook)(size_t before);
 void sp_gc_retune_object(size_t before);
+/* main/main.c */
+unsigned espinel_vm_running(void);
 
 #define SP_ESP_GC_FLOOR   (32 * 1024)  /* collect after this much at least */
 #define SP_ESP_GC_RESERVE (32 * 1024)  /* never budgeted: payloads, drivers */
@@ -27,8 +32,9 @@ void sp_gc_retune_object(size_t before);
 static void sp_esp_gc_retune(size_t before) {
   sp_gc_retune_object(before);
   size_t free_now = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+  unsigned vms = espinel_vm_running();
   size_t room = free_now > SP_ESP_GC_RESERVE
-                    ? (free_now - SP_ESP_GC_RESERVE) / 100 * SP_ESP_GC_SHARE
+                    ? (free_now - SP_ESP_GC_RESERVE) / 100 * SP_ESP_GC_SHARE / (vms ? vms : 1)
                     : 0;
   size_t cap = sp_gc_bytes + room;
   if (sp_gc_threshold > cap) sp_gc_threshold = cap;
