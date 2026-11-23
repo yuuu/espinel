@@ -1,0 +1,5 @@
+four frequencies at once
+ArgumentError: PWM: no LEDC timer left for 5000 Hz (four frequencies at once)
+a moved to 4000 Hz
+ArgumentError: PWM: negative frequency -1
+ArgumentError: PWM: GPIO7 has no frequency yet

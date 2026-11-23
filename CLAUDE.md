@@ -58,6 +58,19 @@ kept in a separate work log, not in this repository.
   A feature with a slash resolves to `packages/<dir>/<name>/<name>.rb`
   (`require "net/mqtt"`: `packages/net/mqtt/mqtt.rb`); Spinel's own
   `net/http` is still found, as `-I` is searched file by file.
+- `test/qemu/*.rb`: tests, each built as the entry point (`-DESPINEL_MAIN`,
+  as `PROJECT=` does) and run under QEMU by `rake test:qemu`
+  (`tools/qemu_test.rb`, run in the container), which diffs the output with
+  `test/qemu/<name>.rb.expected` (`REGEN=1` writes it; review every change
+  by hand). The test build lives in `build-test/` with its own `sdkconfig`
+  (`test/qemu/sdkconfig.defaults` added), whose
+  `CONFIG_ESPINEL_TEST_MARKERS` makes `main.c` print
+  `=== espinel test begin ===` before the program and
+  `=== espinel test end, status <n>` after it; the output between them,
+  less ESP-IDF's log lines, is what is compared, and QEMU is stopped on the
+  second marker, a panic or a reboot. CI: the `qemu` job of
+  `.github/workflows/ci.yml`. The bare `rake test` is left for an
+  aggregate of the `test:*` tasks.
 - `main/`: compiles the entry point (`ESPINEL_MAIN`) to C at build time
   (`spinel -I packages ... -c --cc=<target gcc>`). The generated `main` is renamed with
   `-Dmain=spinel_main`, and `main.c` calls it from a FreeRTOS task with a

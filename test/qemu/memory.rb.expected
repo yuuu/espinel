@@ -1,0 +1,6 @@
+[:total, :used, :free, :largest_free_block, :minimum_free]
+true
+[:size, :used, :peak, :limit, :free]
+true
+[:bytes, :threshold, :count, :full_count]
+ArgumentError: unknown region: :flash (:all, :internal or :spiram)

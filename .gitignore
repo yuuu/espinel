@@ -7,3 +7,4 @@
 /.ccache/
 /examples/*/config.rb
 /.spinel-checkout/
+/build-test/

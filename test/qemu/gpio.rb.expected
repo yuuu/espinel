@@ -1,0 +1,4 @@
+read: 0
+high?: false
+constants: [0, 1]
+ArgumentError: GPIO99: setup failed (esp_err_t 258)
