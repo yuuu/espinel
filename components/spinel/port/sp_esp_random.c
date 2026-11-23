@@ -23,7 +23,9 @@
 void sp_krand_srand(uint64_t seed);
 
 static int urandom_open(const char *path, int flags, int mode) {
-  (void)path; (void)flags; (void)mode;
+  (void)path;
+  (void)flags;
+  (void)mode;
   return 0;
 }
 static ssize_t urandom_read(int fd, void *dst, size_t n) {
@@ -31,7 +33,10 @@ static ssize_t urandom_read(int fd, void *dst, size_t n) {
   esp_fill_random(dst, n);
   return (ssize_t)n;
 }
-static int urandom_close(int fd) { (void)fd; return 0; }
+static int urandom_close(int fd) {
+  (void)fd;
+  return 0;
+}
 static int urandom_fstat(int fd, struct stat *st) {
   (void)fd;
   memset(st, 0, sizeof *st);

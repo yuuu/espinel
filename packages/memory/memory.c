@@ -52,9 +52,7 @@ size_t espinel_mem_stack_used(void) {
 }
 
 /* the most ever in use, from FreeRTOS's high-water mark (bytes on ESP-IDF) */
-size_t espinel_mem_stack_peak(void) {
-  return espinel_ruby_stack_size - uxTaskGetStackHighWaterMark(NULL);
-}
+size_t espinel_mem_stack_peak(void) { return espinel_ruby_stack_size - uxTaskGetStackHighWaterMark(NULL); }
 
 /* the depth at which a Ruby method raises SystemStackError; the whole
    stack when the check is off (CONFIG_ESPINEL_STACK_CHECK) */

@@ -6,7 +6,10 @@ FROM espressif/idf:v6.1
 # Spinel's host build needs a C compiler, make and curl (all in the image),
 # plus the prism gem for the Ruby generator of
 # lib/spinel_rt_responds_generated.h; the image's Ruby 3.2 lacks it.
-RUN apt-get update && apt-get install -y --no-install-recommends ruby-dev \
+# clang-format-20 (Ubuntu 24.04's package) is what rake format and rake lint
+# run on our C.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ruby-dev clang-format-20 \
  && rm -rf /var/lib/apt/lists/* && gem install --no-document prism -v 1.9.0
 
 # The host checkout's build outputs are left out and rebuilt here; `make deps`

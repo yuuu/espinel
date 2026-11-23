@@ -80,9 +80,8 @@ static void ruby_task(void *arg) {
 #if CONFIG_ESPINEL_TEST_MARKERS
   printf("\n" ESPINEL_TEST_END " %d\n", rc);
 #endif
-  printf("spinel_main returned %d (stack left %u bytes, free heap %u bytes)\n",
-         rc, (unsigned)uxTaskGetStackHighWaterMark(NULL),
-         (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
+  printf("spinel_main returned %d (stack left %u bytes, free heap %u bytes)\n", rc,
+         (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
   vTaskDelete(NULL);
 }
 

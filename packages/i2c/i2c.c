@@ -52,8 +52,7 @@ int espinel_i2c_open(int port, int scl, int sda, int frequency) {
 }
 
 static esp_err_t device(int port, int addr, i2c_master_dev_handle_t *ret) {
-  if (!valid_port(port) || !buses[port] || addr < 0 || addr >= ESPINEL_I2C_ADDRS)
-    return ESP_ERR_INVALID_ARG;
+  if (!valid_port(port) || !buses[port] || addr < 0 || addr >= ESPINEL_I2C_ADDRS) return ESP_ERR_INVALID_ARG;
   if (!devices[port][addr]) {
     i2c_device_config_t cfg = {
       .dev_addr_length = I2C_ADDR_BIT_LEN_7,
@@ -81,22 +80,19 @@ int espinel_i2c_write(int port, int addr, const char *data, int len, int timeout
 /* With out_len 0: S, addr R, len bytes into buf, P. Otherwise the out_len
    bytes of out are written first and a repeated start comes before the
    read: S, addr W, out, Sr, addr R, len bytes, P. */
-int espinel_i2c_read(int port, int addr, const char *out, int out_len, void *buf,
-                     int len, int timeout_ms) {
+int espinel_i2c_read(int port, int addr, const char *out, int out_len, void *buf, int len, int timeout_ms) {
   i2c_master_dev_handle_t dev;
   esp_err_t err = device(port, addr, &dev);
   if (err != ESP_OK) return err;
-  if (out_len == 0)
-    return i2c_master_receive(dev, (uint8_t *)buf, (size_t)len, timeout_ms);
-  return i2c_master_transmit_receive(dev, (const uint8_t *)out, (size_t)out_len,
-                                     (uint8_t *)buf, (size_t)len, timeout_ms);
+  if (out_len == 0) return i2c_master_receive(dev, (uint8_t *)buf, (size_t)len, timeout_ms);
+  return i2c_master_transmit_receive(dev, (const uint8_t *)out, (size_t)out_len, (uint8_t *)buf, (size_t)len,
+                                     timeout_ms);
 }
 
 /* ESP_OK when a device answers addr with an ACK, ESP_ERR_NOT_FOUND on a
    NACK */
 int espinel_i2c_probe(int port, int addr, int timeout_ms) {
-  if (!valid_port(port) || !buses[port] || addr < 0 || addr >= ESPINEL_I2C_ADDRS)
-    return ESP_ERR_INVALID_ARG;
+  if (!valid_port(port) || !buses[port] || addr < 0 || addr >= ESPINEL_I2C_ADDRS) return ESP_ERR_INVALID_ARG;
   return i2c_master_probe(buses[port], (uint16_t)addr, timeout_ms);
 }
 

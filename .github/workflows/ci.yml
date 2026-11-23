@@ -1,6 +1,7 @@
-# Builds the development image once (kept in GHCR, tagged by the Spinel
-# commit and the Dockerfile), the firmware for lib/main.rb and every
-# example with it, and runs test/qemu/*.rb under QEMU (rake test:qemu).
+# Checks the C and Ruby format (rake lint), builds the development image
+# once (kept in GHCR, tagged by the Spinel commit and the Dockerfile), the
+# firmware for lib/main.rb and every example with it, and runs
+# test/qemu/*.rb under QEMU (rake test:qemu).
 name: ci
 
 on:
@@ -157,3 +158,33 @@ jobs:
         with:
           name: qemu-test-logs
           path: build-test/logs/
+
+  # clang-format comes with the image, so the check waits for it.
+  lint:
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    env:
+      ESPINEL_IMAGE: ${{ needs.image.outputs.image }}
+    steps:
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: docker pull "$ESPINEL_IMAGE"
+
+      - run: bundle exec rake lint

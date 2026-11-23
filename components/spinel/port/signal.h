@@ -16,23 +16,27 @@
 #endif
 #include <sys/types.h>
 #ifndef SA_SIGINFO
-#define SA_SIGINFO   0x00000002
+#define SA_SIGINFO 0x00000002
 #endif
 #ifndef SA_RESTART
-#define SA_RESTART   0x10000000
+#define SA_RESTART 0x10000000
 #endif
 #ifndef SA_ONSTACK
-#define SA_ONSTACK   0x08000000
+#define SA_ONSTACK 0x08000000
 #endif
 #ifndef SA_NODEFER
-#define SA_NODEFER   0x40000000
+#define SA_NODEFER 0x40000000
 #endif
 #ifndef SA_RESETHAND
 #define SA_RESETHAND 0x80000000
 #endif
 #ifndef SS_DISABLE
 #define SS_DISABLE 2
-typedef struct sigaltstack { void *ss_sp; int ss_flags; size_t ss_size; } stack_t;
+typedef struct sigaltstack {
+  void *ss_sp;
+  int ss_flags;
+  size_t ss_size;
+} stack_t;
 #endif
 int sigaltstack(const stack_t *, stack_t *);
 #endif

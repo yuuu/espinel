@@ -100,8 +100,7 @@ static uint32_t raw_duty(int t, double fraction) {
    them while it runs. freq 0 stops it, low, as does a frequency no timer
    can be had for. */
 int espinel_pwm_set(int c, int freq, double duty) {
-  if (c < 0 || c >= LEDC_CHANNEL_MAX || !channels[c].used || freq < 0)
-    return ESP_ERR_INVALID_ARG;
+  if (c < 0 || c >= LEDC_CHANNEL_MAX || !channels[c].used || freq < 0) return ESP_ERR_INVALID_ARG;
   pwm_channel_t *ch = &channels[c];
   if (freq == 0) {
     release_timer(c);

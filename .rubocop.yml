@@ -1,0 +1,49 @@
+# Layout and Lint only (rake lint, rake format). The programs are compiled
+# by Spinel, so no cop that rewrites code into other constructs (Style)
+# is on: what it suggests is not always something Spinel accepts.
+AllCops:
+  TargetRubyVersion: 4.0
+  NewCops: enable
+  DisabledByDefault: true
+  SuggestExtensions: false
+  Include:
+    - "Rakefile"
+    - "Gemfile"
+    - "lib/**/*.rb"
+    - "examples/**/*.rb"
+    - "packages/**/*.rb"
+  Exclude:
+    - "build/**/*"
+    - "managed_components/**/*"
+    - ".spinel-checkout/**/*"
+    - "vendor/**/*"
+
+Layout:
+  Enabled: true
+
+Lint:
+  Enabled: true
+
+# Not the style here: a guard clause is followed by code more often than
+# by a blank line, and a long string or description stays on one line.
+Layout/EmptyLineAfterGuardClause:
+  Enabled: false
+Layout/LineLength:
+  Enabled: false
+
+# Rewrites that would change working code for little: parentheses around
+# every mixed-precedence expression, super in classes whose parents have no
+# state to set up, keyword arguments the peripheral guide names but the
+# port ignores, and IO#wait_readable in place of the IO.select that the
+# MQTT client runs on Spinel's sockets.
+Lint/AmbiguousOperatorPrecedence:
+  Enabled: false
+Lint/MissingSuper:
+  Enabled: false
+Lint/UnusedMethodArgument:
+  Enabled: false
+Lint/IncompatibleIoSelectWithFiberScheduler:
+  Enabled: false
+# Dir[] sorts already, but rake build:all's order should not rest on it.
+Lint/RedundantDirGlobSort:
+  Enabled: false
