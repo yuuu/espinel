@@ -32,7 +32,7 @@ static const char *TAG = "network";
 /* network.rb names them by these numbers */
 enum { IF_WIFI, IF_ETH, IF_COUNT };
 #define GOT_IP(i) (BIT0 << ((i) * 2))
-#define LOST(i) (BIT1 << ((i) * 2))
+#define LOST(i)   (BIT1 << ((i) * 2))
 
 static esp_netif_t *netifs[IF_COUNT];
 static EventGroupHandle_t events;
@@ -54,9 +54,7 @@ static esp_err_t net_init(void) {
 
 const char *espinel_net_err_name(int err) { return esp_err_to_name(err); }
 
-static int64_t deadline_after(int timeout_ms) {
-  return esp_timer_get_time() + (int64_t)timeout_ms * 1000;
-}
+static int64_t deadline_after(int timeout_ms) { return esp_timer_get_time() + (int64_t)timeout_ms * 1000; }
 
 static TickType_t ticks_until(int64_t deadline) {
   int64_t left = deadline - esp_timer_get_time();
@@ -165,10 +163,8 @@ static bool wifi_refused(int reason) {
   case WIFI_REASON_HANDSHAKE_TIMEOUT:
   case WIFI_REASON_NO_AP_FOUND_W_COMPATIBLE_SECURITY:
   case WIFI_REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD:
-  case WIFI_REASON_NO_AP_FOUND_IN_RSSI_THRESHOLD:
-    return true;
-  default:
-    return false;
+  case WIFI_REASON_NO_AP_FOUND_IN_RSSI_THRESHOLD: return true;
+  default: return false;
   }
 }
 
@@ -191,8 +187,8 @@ int espinel_wifi_connect(const char *ssid, const char *password, int auth, int t
   xEventGroupClearBits(events, GOT_IP(IF_WIFI) | LOST(IF_WIFI));
   for (;;) {
     if ((err = esp_wifi_connect()) != ESP_OK) return err;
-    EventBits_t bits = xEventGroupWaitBits(events, GOT_IP(IF_WIFI) | LOST(IF_WIFI), pdFALSE, pdFALSE,
-                                           ticks_until(deadline));
+    EventBits_t bits =
+        xEventGroupWaitBits(events, GOT_IP(IF_WIFI) | LOST(IF_WIFI), pdFALSE, pdFALSE, ticks_until(deadline));
     if (bits & GOT_IP(IF_WIFI)) return 0;
     if (!(bits & LOST(IF_WIFI))) break;
     xEventGroupClearBits(events, LOST(IF_WIFI));
@@ -233,10 +229,16 @@ int espinel_wifi_auth_wpa_psk(void) { return 2; }
 int espinel_wifi_auth_wpa2_psk(void) { return 3; }
 int espinel_wifi_auth_wpa_wpa2_psk(void) { return 4; }
 int espinel_wifi_auth_wpa3_psk(void) { return 6; }
-int espinel_wifi_init(const char *country) { (void)country; return ESP_ERR_NOT_SUPPORTED; }
+int espinel_wifi_init(const char *country) {
+  (void)country;
+  return ESP_ERR_NOT_SUPPORTED;
+}
 int espinel_wifi_initialized(void) { return 0; }
 int espinel_wifi_connect(const char *s, const char *p, int a, int t) {
-  (void)s; (void)p; (void)a; (void)t;
+  (void)s;
+  (void)p;
+  (void)a;
+  (void)t;
   return ESP_ERR_NOT_SUPPORTED;
 }
 int espinel_wifi_disconnect(void) { return ESP_OK; }
@@ -249,7 +251,8 @@ int espinel_wifi_link_status(void) { return 5; }
 #if CONFIG_ETH_USE_OPENETH
 
 static void eth_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
-  (void)arg; (void)data;
+  (void)arg;
+  (void)data;
   if (base == IP_EVENT && id == IP_EVENT_ETH_GOT_IP) {
     xEventGroupSetBits(events, GOT_IP(IF_ETH));
   } else if (base == IP_EVENT && id == IP_EVENT_ETH_LOST_IP) {
@@ -289,13 +292,16 @@ int espinel_eth_connect(int timeout_ms) {
     if (err != ESP_OK) return err;
     started = true;
   }
-  EventBits_t bits = xEventGroupWaitBits(events, GOT_IP(IF_ETH), pdFALSE, pdFALSE,
-                                         ticks_until(deadline_after(timeout_ms)));
+  EventBits_t bits =
+      xEventGroupWaitBits(events, GOT_IP(IF_ETH), pdFALSE, pdFALSE, ticks_until(deadline_after(timeout_ms)));
   return bits & GOT_IP(IF_ETH) ? 0 : -2;
 }
 
 #else
 
-int espinel_eth_connect(int timeout_ms) { (void)timeout_ms; return ESP_ERR_NOT_SUPPORTED; }
+int espinel_eth_connect(int timeout_ms) {
+  (void)timeout_ms;
+  return ESP_ERR_NOT_SUPPORTED;
+}
 
 #endif

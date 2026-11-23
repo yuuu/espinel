@@ -36,7 +36,8 @@ __attribute__((no_instrument_function)) void sp_esp_stack_check_init(void) {
 __attribute__((no_instrument_function)) uintptr_t sp_esp_stack_limit(void) { return stack_limit; }
 
 __attribute__((no_instrument_function)) void __cyg_profile_func_enter(void *fn, void *site) {
-  (void)fn; (void)site;
+  (void)fn;
+  (void)site;
   if (!stack_limit || (uintptr_t)__builtin_frame_address(0) >= stack_limit) return;
   if (sp_stack_overflow_raise_fn) sp_stack_overflow_raise_fn();   /* returns only if nothing rescues */
   stack_limit = 0;
@@ -46,5 +47,6 @@ __attribute__((no_instrument_function)) void __cyg_profile_func_enter(void *fn, 
 }
 
 __attribute__((no_instrument_function)) void __cyg_profile_func_exit(void *fn, void *site) {
-  (void)fn; (void)site;
+  (void)fn;
+  (void)site;
 }

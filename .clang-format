@@ -1,0 +1,24 @@
+# Our own C: main/, components/spinel/port/, packages/ (rake format, rake lint).
+# Tuned to the style already here: 2-space indents, K&R braces, short
+# functions, ifs and case labels kept on one line, comments left as written.
+BasedOnStyle: LLVM
+IndentWidth: 2
+UseTab: Never
+ColumnLimit: 120
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveMacros: Consecutive
+AlignTrailingComments:
+  Kind: Leave
+AlignOperands: DontAlign
+AlignEscapedNewlines: Left
+PointerAlignment: Right
+Cpp11BracedListStyle: false
+ReflowComments: false
+SortIncludes: Never
+IncludeBlocks: Preserve
+MaxEmptyLinesToKeep: 2

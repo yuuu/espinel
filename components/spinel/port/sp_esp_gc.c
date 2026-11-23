@@ -27,9 +27,7 @@ void sp_gc_retune_object(size_t before);
 static void sp_esp_gc_retune(size_t before) {
   sp_gc_retune_object(before);
   size_t free_now = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-  size_t room = free_now > SP_ESP_GC_RESERVE
-                    ? (free_now - SP_ESP_GC_RESERVE) / 100 * SP_ESP_GC_SHARE
-                    : 0;
+  size_t room = free_now > SP_ESP_GC_RESERVE ? (free_now - SP_ESP_GC_RESERVE) / 100 * SP_ESP_GC_SHARE : 0;
   size_t cap = sp_gc_bytes + room;
   if (sp_gc_threshold > cap) sp_gc_threshold = cap;
 }
