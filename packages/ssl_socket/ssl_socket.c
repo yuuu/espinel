@@ -33,9 +33,9 @@
 extern int sp_ffi_bin_len;
 
 #define SSL_ERR_TIMEOUT (-0x10101)
-#define SSL_ERR_HANDLE (-0x10102)
-#define SSL_ERR_NO_MEM (-0x10103)
-#define SSL_SESSIONS 4
+#define SSL_ERR_HANDLE  (-0x10102)
+#define SSL_ERR_NO_MEM  (-0x10103)
+#define SSL_SESSIONS    4
 
 typedef struct {
   int fd;
@@ -64,9 +64,7 @@ static int fail(int err, const char *what) {
 
 int espinel_ssl_timed_out(int err) { return err == SSL_ERR_TIMEOUT; }
 
-static session_t *session(int h) {
-  return h >= 0 && h < SSL_SESSIONS ? sessions[h] : NULL;
-}
+static session_t *session(int h) { return h >= 0 && h < SSL_SESSIONS ? sessions[h] : NULL; }
 
 /* ---- the descriptor ---- */
 
@@ -177,9 +175,8 @@ static void verify_message(session_t *s) {
    and the certificate check (NULL for neither); ca (PEM, empty for the
    bundle), cert and key (empty for none) are the context's. Answers the
    session's number. */
-int espinel_ssl_connect(int fd, const char *host, int verify, const char *ca, size_t ca_n,
-                        const char *cert, size_t cert_n, const char *key, size_t key_n,
-                        int timeout_ms) {
+int espinel_ssl_connect(int fd, const char *host, int verify, const char *ca, size_t ca_n, const char *cert,
+                        size_t cert_n, const char *key, size_t key_n, int timeout_ms) {
   int h;
   for (h = 0; h < SSL_SESSIONS && sessions[h]; h++) {}
   if (h == SSL_SESSIONS) {
@@ -213,17 +210,25 @@ int espinel_ssl_connect(int fd, const char *host, int verify, const char *ca, si
   if (!rc && cert_n > 0) {
     what = "certificate";
     rc = parse_crt(&s->own, cert, cert_n);
-    if (!rc) { what = "key"; rc = parse_key(&s->key, key, key_n); }
+    if (!rc) {
+      what = "key";
+      rc = parse_key(&s->key, key, key_n);
+    }
     if (!rc) rc = mbedtls_ssl_conf_own_cert(&s->conf, &s->own, &s->key);
   }
-  if (!rc) { what = "SSL setup"; rc = mbedtls_ssl_setup(&s->ssl, &s->conf); }
-  if (!rc && host) { what = "SSL hostname"; rc = mbedtls_ssl_set_hostname(&s->ssl, host); }
+  if (!rc) {
+    what = "SSL setup";
+    rc = mbedtls_ssl_setup(&s->ssl, &s->conf);
+  }
+  if (!rc && host) {
+    what = "SSL hostname";
+    rc = mbedtls_ssl_set_hostname(&s->ssl, host);
+  }
   if (!rc) {
     what = "SSL handshake";
     mbedtls_ssl_set_bio(&s->ssl, s, bio_send, bio_recv, NULL);
     set_deadline(s, timeout_ms);
-    while ((rc = mbedtls_ssl_handshake(&s->ssl)) == MBEDTLS_ERR_SSL_WANT_READ ||
-           rc == MBEDTLS_ERR_SSL_WANT_WRITE) {}
+    while ((rc = mbedtls_ssl_handshake(&s->ssl)) == MBEDTLS_ERR_SSL_WANT_READ || rc == MBEDTLS_ERR_SSL_WANT_WRITE) {}
   }
   if (rc) {
     fail(rc, what);
@@ -231,8 +236,7 @@ int espinel_ssl_connect(int fd, const char *host, int verify, const char *ca, si
     if (rc == MBEDTLS_ERR_X509_FATAL_ERROR && verify && ca_n == 0)
       snprintf(message, sizeof message,
                "SSL handshake: the server's certificate is not signed by a CA in ESP-IDF's bundle");
-    else
-      verify_message(s);
+    else verify_message(s);
     session_free(s);
     return rc;
   }
@@ -269,7 +273,10 @@ const char *espinel_ssl_out(void) {
 int espinel_ssl_read(int h, size_t max, int timeout_ms) {
   session_t *s = session(h);
   if (!s) return fail(SSL_ERR_HANDLE, "SSL read");
-  if (max == 0) { in_len = 0; return 0; }
+  if (max == 0) {
+    in_len = 0;
+    return 0;
+  }
   if (max > in_cap) {
     unsigned char *p = realloc(in, max);
     if (!p) return fail(SSL_ERR_NO_MEM, "SSL read");

@@ -250,6 +250,12 @@ so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:
 | `rake shell` | open a shell in the container |
 | `rake exec CMD='...'` | run a command in the container |
 
+`format` rewrites our C (`main/`, `components/spinel/port/`, `packages/`)
+to `.clang-format` with the image's clang-format, and corrects the Ruby
+with RuboCop on the host (`.rubocop.yml`: Layout and Lint cops only). `lint` checks
+the same without changing anything and fails on any difference; CI runs it
+on every pull request.
+
 ## Tests
 
 ```sh

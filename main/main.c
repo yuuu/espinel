@@ -67,9 +67,8 @@ static void ruby_task(void *arg) {
   else rc = ruby_exit_status;
   ruby_task_handle = NULL;
   fflush(NULL);
-  printf("spinel_main returned %d (stack left %u bytes, free heap %u bytes)\n",
-         rc, (unsigned)uxTaskGetStackHighWaterMark(NULL),
-         (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
+  printf("spinel_main returned %d (stack left %u bytes, free heap %u bytes)\n", rc,
+         (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
   vTaskDelete(NULL);
 }
 
