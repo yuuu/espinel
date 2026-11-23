@@ -26,9 +26,4 @@
    overflows. It grows by realloc from here. */
 #define SP_GC_MARK_STACK_MAX 1024   /* initial GC mark stack: 4 KB (64 K entries) */
 
-/* stands in for the NULL of an empty inspector table in the generated C
-   (main/CMakeLists.txt) */
-#include <stdint.h>
-const char *sp_esp_insp_none(void *obj, const uint8_t *nb);
-
 #endif
