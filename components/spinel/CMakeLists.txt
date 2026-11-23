@@ -17,15 +17,22 @@ set(SPINEL_RT_MEMBERS
   sp_process sp_process_status)
 set(SPINEL_RE_SRCS re_compile re_exec re_utf8 unicase re_spinel)
 
-set(srcs port/sp_esp.c port/sp_esp_gc.c port/sp_esp_random.c)
+# The runtime, built into an archive of its own that the app does not link:
+# every Ruby VM takes the members it needs from it into an object of its own
+# (main/CMakeLists.txt), so each VM has its own copy of Spinel's globals.
+# sp_esp_gc.c reads and sets those globals, so it goes with them.
+set(rt_srcs port/sp_esp_gc.c)
 foreach(m ${SPINEL_RT_MEMBERS})
-  list(APPEND srcs ${SPINEL_LIB}/${m}.c)
+  list(APPEND rt_srcs ${SPINEL_LIB}/${m}.c)
 endforeach()
 foreach(m ${SPINEL_RE_SRCS})
-  list(APPEND srcs ${SPINEL_LIB}/regexp/${m}.c)
+  list(APPEND rt_srcs ${SPINEL_LIB}/regexp/${m}.c)
 endforeach()
 
-idf_component_register(SRCS ${srcs}
+# The component itself is what stands in for the C library (one for the
+# whole process, shared by every VM). WHOLE_ARCHIVE: its poll replaces
+# ESP-IDF's.
+idf_component_register(SRCS port/sp_esp.c port/sp_esp_random.c
                        INCLUDE_DIRS port ${SPINEL_LIB}
                        PRIV_INCLUDE_DIRS ${SPINEL_LIB}/regexp ${SPINEL_LIB}/regexp/shim
                        REQUIRES pthread lwip esp_hw_support heap esp_timer vfs
@@ -38,7 +45,18 @@ target_compile_options(${COMPONENT_LIB} PUBLIC ${SPINEL_DEFS})
 target_compile_options(${COMPONENT_LIB} PRIVATE -O2 -Wno-all -w)
 
 # picolibc's fflush(NULL) dereferences the NULL instead of flushing every
-# stream; sp_esp.c's __wrap_fflush takes it (the runtime and main.c call it).
+# stream; sp_esp.c's __wrap_fflush takes it (every VM's runtime calls it).
 if(CONFIG_LIBC_PICOLIBC)
   target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=fflush")
 endif()
+
+if(CMAKE_BUILD_EARLY_EXPANSION)
+  return()
+endif()
+
+add_library(espinel_rt STATIC ${rt_srcs})
+target_link_libraries(espinel_rt PRIVATE ${COMPONENT_LIB})
+# port/ ahead of every other component's headers, as for the component
+target_include_directories(espinel_rt BEFORE PRIVATE port ${SPINEL_LIB}
+                           ${SPINEL_LIB}/regexp ${SPINEL_LIB}/regexp/shim)
+target_compile_options(espinel_rt PRIVATE -O2 -Wno-all -w)

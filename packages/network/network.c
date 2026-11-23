@@ -19,6 +19,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "espinel_task.h"
 #if SOC_WIFI_SUPPORTED
 #include "esp_wifi.h"
 #include "nvs_flash.h"
@@ -66,14 +67,16 @@ static TickType_t ticks_until(int64_t deadline) {
 /* address, netmask or gateway (which 0, 1, 2) of an interface with an
    address; "" otherwise */
 const char *espinel_net_ipv4(int ifc, int which) {
-  static char buf[16];
+  static const char key;
+  char *buf = espinel_vm_local(&key, 16, NULL);   /* the calling program's */
   esp_netif_ip_info_t info;
+  if (!buf) return "";
   buf[0] = '\0';
   if (ifc < 0 || ifc >= IF_COUNT || !netifs[ifc] || !events) return buf;
   if (!(xEventGroupGetBits(events) & GOT_IP(ifc))) return buf;
   if (esp_netif_get_ip_info(netifs[ifc], &info) != ESP_OK) return buf;
   esp_ip4_addr_t *a = which == 1 ? &info.netmask : which == 2 ? &info.gw : &info.ip;
-  snprintf(buf, sizeof buf, IPSTR, IP2STR(a));
+  snprintf(buf, 16, IPSTR, IP2STR(a));
   return buf;
 }
 

@@ -36,9 +36,8 @@
 #include "mbedtls/pk.h"
 #include "mbedtls/platform_util.h"
 #include "psa/crypto.h"
+#include "espinel_task.h"
 
-/* the byte count of a :binstr return (Spinel's sp_alloc.h) */
-extern int sp_ffi_bin_len;
 
 #define TLS_ERR_STATE (-0x10001)    /* called out of order */
 #define TLS_ERR_LENGTH (-0x10002)   /* a key, IV or tag of the wrong size */
@@ -48,8 +47,14 @@ extern int sp_ffi_bin_len;
 #define TLS_ERR_NO_MEM (-0x10006)
 #define TLS_ERR_ALG (-0x10007)      /* an unsupported digest */
 
+/* the calling program's message buffer (packages/task) */
+static char *error_buf(void) {
+  static const char key;
+  return espinel_vm_local(&key, 128, NULL);
+}
+
 const char *espinel_tls_error(int err) {
-  static char buf[128];
+  char *buf = error_buf();
   switch (err) {
   case TLS_ERR_STATE: return "called out of order";
   case TLS_ERR_LENGTH: return "invalid length";
@@ -59,39 +64,58 @@ const char *espinel_tls_error(int err) {
   case TLS_ERR_NO_MEM: return "out of memory";
   case TLS_ERR_ALG: return "unsupported digest";
   }
-  mbedtls_strerror(err, buf, sizeof buf);
+  if (!buf) return "out of memory";
+  mbedtls_strerror(err, buf, 128);
   return buf;
 }
 
-/* ---- the result buffer ---- */
+/* ---- the result buffer ----
 
-static unsigned char *out;
-static size_t out_cap, out_len;
+   The calling program's (packages/task), from the call that fills it to
+   the espinel_tls_out that hands it to Ruby. Every call that writes
+   OUT->p has reserved it first, so OUT is not NULL there. */
+
+typedef struct {
+  unsigned char *p;
+  size_t cap, len;
+} out_buf;
+
+static void out_free(void *block) { free(((out_buf *)block)->p); }
+
+static out_buf *out_get(void) {
+  static const char key;
+  return espinel_vm_local(&key, sizeof(out_buf), out_free);
+}
+#define OUT out_get()
 
 static unsigned char *out_reserve(size_t n) {
-  if (n > out_cap) {
-    unsigned char *p = realloc(out, n);
+  out_buf *b = OUT;
+  if (!b) return NULL;
+  if (n > b->cap) {
+    unsigned char *p = realloc(b->p, n);
     if (!p) return NULL;
-    out = p;
-    out_cap = n;
+    b->p = p;
+    b->cap = n;
   }
-  return out;
+  return b->p;
 }
 
 static int out_set(size_t n) {
-  out_len = n;
+  out_buf *b = OUT;
+  if (b) b->len = n;
   return (int)n;
 }
 
 static int out_copy(const void *p, size_t n) {
   if (!out_reserve(n ? n : 1)) return TLS_ERR_NO_MEM;
-  memcpy(out, p, n);
+  memcpy(OUT->p, p, n);
   return out_set(n);
 }
 
 const char *espinel_tls_out(void) {
-  sp_ffi_bin_len = (int)out_len;
-  return out ? (const char *)out : "";
+  out_buf *b = OUT;
+  espinel_ffi_bin_len(b ? (int)b->len : 0);
+  return b && b->p ? (const char *)b->p : "";
 }
 
 /* ---- SHA-1 and SHA-256 on the SHA peripheral ----
@@ -192,7 +216,7 @@ int espinel_tls_digest_finish(digest_t *d) {
   if (d->finished) return TLS_ERR_STATE;
   if (!out_reserve(32)) return TLS_ERR_NO_MEM;
   d->finished = true;
-  sha_finish(&d->sha, out);
+  sha_finish(&d->sha, OUT->p);
   return out_set(sha_len(&d->sha));
 }
 
@@ -261,7 +285,7 @@ int espinel_tls_hmac_finish(hmac_t *h) {
   sha_start(&outer, SHA2_256);
   sha_update(&outer, opad, 64);
   sha_update(&outer, ih, 32);
-  sha_finish(&outer, out);
+  sha_finish(&outer, OUT->p);
   mbedtls_platform_zeroize(opad, sizeof opad);
   mbedtls_platform_zeroize(ih, sizeof ih);
   return out_set(32);
@@ -343,7 +367,7 @@ int espinel_tls_cmac_finish(cmac_t *c) {
     for (int i = 0; i < 16; i++) last[i] ^= c->k2[i];
   }
   int err = cmac_chain(c, last);
-  if (!err) memcpy(out, c->x, 16);
+  if (!err) memcpy(OUT->p, c->x, 16);
   espinel_tls_cmac_reset(c);
   return err ? err : out_set(16);
 }
@@ -436,7 +460,7 @@ int espinel_tls_cipher_update(cipher_t *c, const unsigned char *in, size_t n) {
   if (c->mode == MODE_GCM) {
     size_t olen = 0;
     int err = gcm_ready(c);
-    if (!err) err = esp_aes_gcm_update(&c->u.gcm, in, n, out, n + 16, &olen);
+    if (!err) err = esp_aes_gcm_update(&c->u.gcm, in, n, OUT->p, n + 16, &olen);
     return err ? err : out_set(olen);
   }
   if (!c->key_set || !c->iv_set || c->finished) return TLS_ERR_STATE;
@@ -445,7 +469,7 @@ int espinel_tls_cipher_update(cipher_t *c, const unsigned char *in, size_t n) {
     /* a full block goes out once more input follows it: decryption keeps
        the last one for finish, which strips its padding */
     if (c->buf_len == 16) {
-      int err = cbc_block(c, c->buf, out + produced);
+      int err = cbc_block(c, c->buf, OUT->p + produced);
       if (err) return err;
       produced += 16;
       c->buf_len = 0;
@@ -457,7 +481,7 @@ int espinel_tls_cipher_update(cipher_t *c, const unsigned char *in, size_t n) {
     n -= take;
   }
   if (c->buf_len == 16 && c->op == ESP_AES_ENCRYPT) {
-    int err = cbc_block(c, c->buf, out + produced);
+    int err = cbc_block(c, c->buf, OUT->p + produced);
     if (err) return err;
     produced += 16;
     c->buf_len = 0;
@@ -470,7 +494,7 @@ int espinel_tls_cipher_finish(cipher_t *c) {
   if (c->mode == MODE_GCM) {
     size_t olen = 0;
     int err = gcm_ready(c);
-    if (!err) err = esp_aes_gcm_finish(&c->u.gcm, out, 16, &olen, c->tag, 16);
+    if (!err) err = esp_aes_gcm_finish(&c->u.gcm, OUT->p, 16, &olen, c->tag, 16);
     if (err) return err;
     c->finished = true;
     return out_set(olen);
@@ -480,16 +504,16 @@ int espinel_tls_cipher_finish(cipher_t *c) {
   if (c->op == ESP_AES_ENCRYPT) {
     unsigned char pad = (unsigned char)(16 - c->buf_len);
     memset(c->buf + c->buf_len, pad, pad);
-    int err = cbc_block(c, c->buf, out);
+    int err = cbc_block(c, c->buf, OUT->p);
     return err ? err : out_set(16);
   }
   if (c->buf_len != 16) return TLS_ERR_PADDING;
-  int err = cbc_block(c, c->buf, out);
+  int err = cbc_block(c, c->buf, OUT->p);
   if (err) return err;
-  unsigned char pad = out[15];
+  unsigned char pad = OUT->p[15];
   if (pad == 0 || pad > 16) return TLS_ERR_PADDING;
   for (int i = 16 - pad; i < 16; i++)
-    if (out[i] != pad) return TLS_ERR_PADDING;
+    if (OUT->p[i] != pad) return TLS_ERR_PADDING;
   return out_set(16 - pad);
 }
 
@@ -517,9 +541,20 @@ int espinel_tls_pk_rsa(void) { return PK_RSA; }
 int espinel_tls_pk_ec(void) { return PK_EC; }
 
 /* what the last parse found */
-static int pk_last_type, pk_last_private;
-int espinel_tls_pk_type(void) { return pk_last_type; }
-int espinel_tls_pk_private(void) { return pk_last_private; }
+typedef struct {
+  int type, private;
+} pk_last_t;
+
+/* the calling program's (packages/task) */
+static pk_last_t *pk_last(void) {
+  static const char key;
+  static pk_last_t none;   /* out of memory: written and read as nothing */
+  pk_last_t *l = espinel_vm_local(&key, sizeof(pk_last_t), NULL);
+  return l ? l : &none;
+}
+
+int espinel_tls_pk_type(void) { return pk_last()->type; }
+int espinel_tls_pk_private(void) { return pk_last()->private; }
 
 /* the key in pem (PEM or DER); private tells which kind it is */
 static int pk_load(mbedtls_pk_context *pk, const char *pem, size_t n, bool *private) {
@@ -552,9 +587,9 @@ static int pk_type(mbedtls_pk_context *pk) {
 /* the key as PEM: the private key when it has one */
 static int pk_pem(mbedtls_pk_context *pk, bool private) {
   if (!out_reserve(8192)) return TLS_ERR_NO_MEM;
-  int err = private ? mbedtls_pk_write_key_pem(pk, out, out_cap)
-                    : mbedtls_pk_write_pubkey_pem(pk, out, out_cap);
-  return err ? err : out_set(strlen((const char *)out));
+  int err = private ? mbedtls_pk_write_key_pem(pk, OUT->p, OUT->cap)
+                    : mbedtls_pk_write_pubkey_pem(pk, OUT->p, OUT->cap);
+  return err ? err : out_set(strlen((const char *)OUT->p));
 }
 
 /* parses a key, answering its PEM (espinel_tls_pk_type and _private tell
@@ -566,8 +601,8 @@ int espinel_tls_pk_parse(const char *pem, size_t n, int want) {
   int err = pk_load(&pk, pem, n, &private);
   if (!err && want && pk_type(&pk) != want) err = TLS_ERR_KEY_TYPE;
   if (!err) {
-    pk_last_type = pk_type(&pk);
-    pk_last_private = private;
+    pk_last()->type = pk_type(&pk);
+    pk_last()->private = private;
     err = pk_pem(&pk, private);
   }
   mbedtls_pk_free(&pk);
@@ -580,8 +615,8 @@ int espinel_tls_pk_public(const char *pem, size_t n) {
   mbedtls_pk_init(&pk);
   int err = pk_load(&pk, pem, n, &private);
   if (!err) {
-    pk_last_type = pk_type(&pk);
-    pk_last_private = 0;
+    pk_last()->type = pk_type(&pk);
+    pk_last()->private = 0;
     err = pk_pem(&pk, false);
   }
   mbedtls_pk_free(&pk);
@@ -607,8 +642,8 @@ static int pk_generate(psa_key_attributes_t *attr, const uint8_t *exponent, size
   int err = mbedtls_pk_copy_from_psa(id, &pk);
   psa_destroy_key(id);
   if (!err) {
-    pk_last_type = type;
-    pk_last_private = 1;
+    pk_last()->type = type;
+    pk_last()->private = 1;
     err = pk_pem(&pk, true);
   }
   mbedtls_pk_free(&pk);
@@ -668,7 +703,7 @@ int espinel_tls_pk_sign(const char *pem, size_t n, int alg, const unsigned char 
   mbedtls_pk_init(&pk);
   err = pk_load(&pk, pem, n, &private);
   if (!err && !private) err = TLS_ERR_KEY_TYPE;
-  if (!err) err = mbedtls_pk_sign(&pk, (mbedtls_md_type_t)alg, hash, hash_len, out,
+  if (!err) err = mbedtls_pk_sign(&pk, (mbedtls_md_type_t)alg, hash, hash_len, OUT->p,
                                   MBEDTLS_PK_SIGNATURE_MAX_SIZE, &sig_len);
   mbedtls_pk_free(&pk);
   return err ? err : out_set(sig_len);

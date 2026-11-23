@@ -149,9 +149,11 @@ task :menuconfig do
   container "idf.py", "menuconfig"
 end
 
-desc "Print the C that Spinel generates for lib/main.rb (or PROJECT=<dir>)"
+desc "Print the C that Spinel generates for lib/main.rb (or PROJECT=<dir>; TASK=<name> for its tasks/<name>.rb)"
 task :c do
-  container "spinel", "-I", "packages", ruby_main, "-S"
+  entry = ruby_main
+  entry = File.join(File.dirname(entry), "tasks", "#{ENV["TASK"]}.rb") unless ENV["TASK"].to_s.empty?
+  container "spinel", "-I", "packages", entry, "-S"
 end
 
 desc "Decode backtrace addresses: rake addr2line ADDRS='0x4200760a 0x4202c085'"
