@@ -1,6 +1,6 @@
-# Builds the development image once (kept in GHCR, tagged by the Spinel
-# commit and the Dockerfile) and the firmware for lib/main.rb and every
-# example with it.
+# Checks the C and Ruby format (rake lint), builds the development image
+# once (kept in GHCR, tagged by the Spinel commit and the Dockerfile) and
+# the firmware for lib/main.rb and every example with it.
 name: ci
 
 on:
@@ -17,6 +17,20 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - uses: astral-sh/setup-uv@v6
+
+      - run: bundle exec rake lint
+
   image:
     runs-on: ubuntu-latest
     timeout-minutes: 60
