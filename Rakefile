@@ -178,6 +178,13 @@ task :c do
   container "spinel", "-I", "packages", ruby_main, "-S"
 end
 
+namespace :test do
+  desc "Compile test/host/*_test.rb for the host with stubbed C and run them (TESTS='spi i2c' to choose)"
+  task :host do
+    container "ruby", "tools/host_test.rb", *ENV["TESTS"].to_s.split(/[\s,]+/)
+  end
+end
+
 desc "Decode backtrace addresses: rake addr2line ADDRS='0x4200760a 0x4202c085'"
 task :addr2line do
   addrs = ENV.fetch("ADDRS") { abort "set ADDRS to the backtrace's addresses" }.split
