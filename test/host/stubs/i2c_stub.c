@@ -29,7 +29,7 @@ int espinel_i2c_port_count(void) { return 2; }
 int espinel_i2c_not_found(void) { return ESP_ERR_NOT_FOUND; }
 
 int espinel_i2c_open(int port, int scl, int sda, int frequency) {
-  int a[4] = {port, scl, sda, frequency};
+  int a[4] = { port, scl, sda, frequency };
   memcpy(open_args, a, sizeof a);
   return take(&fail_open);
 }
@@ -40,8 +40,7 @@ int espinel_i2c_write(int port, int addr, const char *data, int len, int timeout
   return take(&fail_write);
 }
 
-int espinel_i2c_read(int port, int addr, const char *out, int out_len, void *buf,
-                     int len, int timeout_ms) {
+int espinel_i2c_read(int port, int addr, const char *out, int out_len, void *buf, int len, int timeout_ms) {
   (void)port;
   record(addr, out, out_len, timeout_ms);
   int err = take(&fail_read);

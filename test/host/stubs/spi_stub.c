@@ -21,13 +21,13 @@ int espinel_spi_first_unit(void) { return 2; }
 int espinel_spi_last_unit(void) { return 3; }
 
 int espinel_spi_open(int unit, int sck, int copi, int cipo) {
-  int a[4] = {unit, sck, copi, cipo};
+  int a[4] = { unit, sck, copi, cipo };
   memcpy(open_args, a, sizeof a);
   return take(&fail_open);
 }
 
 int espinel_spi_device(int unit, int frequency, int mode, int lsb_first, int cs) {
-  int a[5] = {unit, frequency, mode, lsb_first, cs};
+  int a[5] = { unit, frequency, mode, lsb_first, cs };
   memcpy(device_args, a, sizeof a);
   return take(&fail_device);
 }

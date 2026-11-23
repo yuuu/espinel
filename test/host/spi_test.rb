@@ -33,7 +33,7 @@ end
 
 test("the settings given reach the device") do
   SPI.new(3, frequency: 8_000_000, mode: 3, first_bit: SPI::LSB_FIRST,
-          sck_pin: 1, copi_pin: 2, cipo_pin: 3, cs_pin: 4)
+             sck_pin: 1, copi_pin: 2, cipo_pin: 3, cs_pin: 4)
   assert_equal [3, 1, 2, 3], open_args
   assert_equal [3, 8_000_000, 3, 1, 4], device_args
   SPI.new(unit: 3, sck_pin: 1)
