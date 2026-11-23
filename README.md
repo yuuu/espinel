@@ -245,6 +245,22 @@ so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:
 | `rake size` | show the firmware's memory usage |
 | `rake menuconfig` | open menuconfig |
 | `rake c` | print the C that Spinel generates for `lib/main.rb` |
+| `rake test:host` | run the host tests (see Tests) |
 | `rake addr2line ADDRS='0x... 0x...'` | decode a backtrace |
 | `rake shell` | open a shell in the container |
 | `rake exec CMD='...'` | run a command in the container |
+
+## Tests
+
+```sh
+bundle exec rake test:host                  # every test/host/*_test.rb
+bundle exec rake test:host TESTS='spi i2c'  # some of them
+```
+
+`rake test:host` compiles each `test/host/<name>_test.rb` with Spinel for
+the container itself (its gcc, not the ESP toolchain) and runs it there:
+no QEMU, no board. The packages' C is replaced by stubs
+(`test/host/stubs/`), so what is tested is the Ruby side: the MQTT
+packets and keep-alive, and what the peripheral packages hand ESP-IDF and
+make of its errors. The tests compile in parallel, each in 5 to 10
+seconds. CI runs them on every push.
