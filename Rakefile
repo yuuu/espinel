@@ -113,7 +113,7 @@ end
 CLANG_FORMAT = "clang-format-20"
 
 def own_c_files
-  Dir["{main,components/spinel/port,packages}/**/*.{c,h}"].sort
+  Dir["{main,components/spinel/port,packages,test}/**/*.{c,h}"].sort
 end
 
 desc "Format our C (clang-format) and Ruby (RuboCop's Layout and Lint corrections)"
