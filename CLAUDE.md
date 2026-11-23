@@ -86,10 +86,11 @@ The model for all of this is Spinel's own wasm32-wasi port
 - The runtime and the generated C are compiled with `-w`: ESP-IDF's
   `-Werror=all` fails on Spinel's code, which Spinel builds with
   `-Wno-all`.
-- `--ext-init` (a library entry instead of `main`) does not compile for
-  small programs, on any host: `spinel_rt.h`'s `SP_TU_NO_POLY_RENDER`
-  fallbacks clash with the ext kernel's extern declarations. Hence the
-  renamed `main`.
+- The generated `main` is renamed rather than built with `--ext-init`
+  (a library entry): an ext-init's top level drops an
+  `if __FILE__ == $0` block and leaves the `at_exit` hooks to the C
+  library's exit, which a program here that ends by returning never
+  calls.
 - `mmap` always fails here, so the slab allocator is off (every object is a
   `malloc`), `sp_main_stack_run` runs the program on the calling task's
   stack, and `Fiber` cannot get a stack. Thread is not supported.
@@ -200,10 +201,13 @@ The model for all of this is Spinel's own wasm32-wasi port
   `spinel_main returned <status>` and the chip idles. The program is not
   run again: Spinel's state is not reset.
 - Memory: about 320 KB of free heap with internal RAM only. Spinel's GC
-  thresholds (256 KB each for objects and strings) are sized for a desktop,
-  and a failed `malloc`/`realloc` ends the program (`sp_oom_die`) without
-  trying a collection first. Objects made by top-level code are not
-  reclaimed by `GC.start` (on any host); work done inside methods is.
+  thresholds (256 KB each for objects and strings) are sized for a desktop
+  (`port/sp_esp_gc.c` caps them by the free heap). An object whose
+  `malloc` fails runs a full collection and tries once more; any other
+  failed `malloc`/`realloc` (an Array's or a Hash's storage, say) ends the
+  program (`sp_oom_die`) without collecting. Objects made by top-level
+  code are not reclaimed by `GC.start` (on any host); work done inside
+  methods is.
 - New `sdkconfig.defaults` entries take effect only after deleting
   `sdkconfig` (and `build/`). Components that need `esp_psram` and the like
   must list it in their `REQUIRES`.
