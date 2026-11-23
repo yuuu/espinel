@@ -30,9 +30,9 @@ kept in a separate work log, not in this repository.
   GitHub and RubyGems, a plain-Ruby ROM loader client and serial monitor).
   They read the chip, images and baud rate from `build/flasher_args.json`
   and `build/project_description.json`. Fix the gem there, not here.
-- `rake format` / `rake lint` (host-side, no image): clang-format 23.1.5
-  via `uvx` on our C (`main/`, `components/spinel/port/`, `packages/`;
-  `.clang-format`) and RuboCop on the Ruby (`.rubocop.yml`, Layout and
+- `rake format` / `rake lint`: the image's clang-format-20 (Ubuntu
+  24.04's package, installed by the Dockerfile) on our C (`main/`, `components/spinel/port/`, `packages/`;
+  `.clang-format`) and RuboCop on the host on the Ruby (`.rubocop.yml`, Layout and
   Lint only: Style rewrites can produce Ruby Spinel rejects). CI fails on
   any difference, so run `rake format` before committing. Keep a block
   laid out by hand between `/* clang-format off */` and `on` (the

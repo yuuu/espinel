@@ -107,10 +107,10 @@ task clobber: :clean do
   rm_f %w[sdkconfig sdkconfig.old]
 end
 
-# Formatting and linting run on the host, not in the image: clang-format
-# from its PyPI wheel at a fixed version through uvx (uv), RuboCop from the
-# Gemfile. Spinel's runtime and generated C are not ours to format.
-CLANG_FORMAT = ["uvx", "clang-format@23.1.5"].freeze
+# clang-format runs in the image (its version comes with the Dockerfile),
+# RuboCop on the host from the Gemfile. Spinel's runtime and generated C are
+# not ours to format.
+CLANG_FORMAT = "clang-format-20"
 
 def own_c_files
   Dir["{main,components/spinel/port,packages}/**/*.{c,h}"].sort
@@ -118,13 +118,13 @@ end
 
 desc "Format our C (clang-format) and Ruby (RuboCop's Layout and Lint corrections)"
 task :format do
-  sh(*CLANG_FORMAT, "-i", *own_c_files)
+  container CLANG_FORMAT, "-i", *own_c_files
   sh "bundle", "exec", "rubocop", "--autocorrect"
 end
 
 desc "Check the C and Ruby format without changing anything (what CI runs)"
 task :lint do
-  sh(*CLANG_FORMAT, "--dry-run", "--Werror", *own_c_files)
+  container CLANG_FORMAT, "--dry-run", "--Werror", *own_c_files
   sh "bundle", "exec", "rubocop"
 end
 

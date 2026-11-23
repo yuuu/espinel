@@ -8,7 +8,6 @@ one it has been run on; the others are being brought up (see Targets).
 
 - Docker
 - Ruby (see `.ruby-version`) and Bundler, for the Rake tasks
-- [uv](https://docs.astral.sh/uv/), for `rake format` and `rake lint` only
 - A checkout of Spinel next to this directory (`../spinel`). Set
   `SPINEL_CHECKOUT` to use another location.
 
@@ -250,9 +249,8 @@ so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:
 | `rake shell` | open a shell in the container |
 | `rake exec CMD='...'` | run a command in the container |
 
-`rake format` and `rake lint` run on the host. `format` rewrites our C
-(`main/`, `components/spinel/port/`, `packages/`) with clang-format, pinned
-in the `Rakefile` and fetched by `uvx`, to `.clang-format`, and corrects the
-Ruby with RuboCop (`.rubocop.yml`: Layout and Lint cops only). `lint` checks
+`format` rewrites our C (`main/`, `components/spinel/port/`, `packages/`)
+to `.clang-format` with the image's clang-format, and corrects the Ruby
+with RuboCop on the host (`.rubocop.yml`: Layout and Lint cops only). `lint` checks
 the same without changing anything and fails on any difference; CI runs it
 on every pull request.
