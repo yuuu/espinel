@@ -1,8 +1,10 @@
 require "json"
 require "esp_flash"
 
-IMAGE = "espinel-idf:v6.1"
+IMAGE = ENV.fetch("ESPINEL_IMAGE", "espinel-idf:v6.1")
 SPINEL_CHECKOUT = ENV.fetch("SPINEL_CHECKOUT", "../spinel")
+# The matz/spinel commit the image is built and tested with (CI checks it out)
+SPINEL_VERSION = File.read(File.join(__dir__, ".spinel-version")).strip
 
 CCACHE = ENV.fetch("CCACHE", "1") == "0" ? "0" : "1"
 
@@ -48,6 +50,8 @@ task default: :build
 
 desc "Build the development image (ESP-IDF plus Spinel from #{SPINEL_CHECKOUT})"
 task :image do
+  head = `git -C #{SPINEL_CHECKOUT} rev-parse HEAD 2>/dev/null`.strip
+  warn "note: #{SPINEL_CHECKOUT} is at #{head.empty? ? "an unknown commit" : head}, not .spinel-version's #{SPINEL_VERSION}" if head != SPINEL_VERSION
   sh "docker", "build", "--build-context", "spinel=#{SPINEL_CHECKOUT}",
      "-f", "docker/Dockerfile", "-t", IMAGE, "."
 end
@@ -71,6 +75,26 @@ task :build do
   wanted = ENV["TARGET"]
   set_target wanted if wanted && wanted != configured_target
   container "idf.py", "-DESPINEL_MAIN=#{ruby_main}", "build"
+end
+
+desc "Build lib/main.rb and every example in turn (TARGET=<soc> as for rake build); what CI runs"
+task "build:all" do
+  projects = ["lib", *Dir["examples/*/main.rb"].sort.map { |f| File.dirname(f) }]
+  projects.each do |project|
+    # An example that reads a config.rb builds with its config.example.rb
+    example = File.join(project, "config.example.rb")
+    config = File.join(project, "config.rb")
+    stand_in = File.exist?(example) && !File.exist?(config)
+    cp example, config if stand_in
+    begin
+      puts "== #{project}"
+      ENV["PROJECT"] = File.join(__dir__, project)
+      Rake::Task[:build].reenable
+      Rake::Task[:build].invoke
+    ensure
+      rm_f config if stand_in
+    end
+  end
 end
 
 desc "Remove the build directory"
