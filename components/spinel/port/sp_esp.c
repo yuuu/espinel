@@ -40,6 +40,7 @@
 #include "freertos/task.h"
 #include "esp_timer.h"
 
+/* clang-format off */
 /* memory mapping */
 void *mmap(void *a, size_t n, int prot, int fl, int fd, off_t off) {
   (void)a; (void)n; (void)prot; (void)fl; (void)fd; (void)off;
@@ -110,6 +111,7 @@ pid_t setsid(void) { errno = ENOSYS; return -1; }
 /* resource limits */
 int getrlimit(int r, struct rlimit *l) { (void)r; (void)l; errno = ENOSYS; return -1; }
 int setrlimit(int r, const struct rlimit *l) { (void)r; (void)l; errno = ENOSYS; return -1; }
+/* clang-format on */
 
 #if CONFIG_LIBC_NEWLIB
 /* stdio: newlib's names for the POSIX line readers */
