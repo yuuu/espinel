@@ -4,4 +4,4 @@ at_exit { puts "first registered, runs last" }
 at_exit { puts "second registered, runs first" }
 puts "exiting"
 exit 0
-puts "not reached"
+puts "not reached" # rubocop:disable Lint/UnreachableCode

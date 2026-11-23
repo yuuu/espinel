@@ -4,10 +4,10 @@ require "memory"
 
 heap = Memory.heap
 puts heap.keys.inspect
-puts heap.values.all? { |v| v.is_a?(Integer) && v >= 0 }
+puts(heap.values.all? { |v| v.is_a?(Integer) && v >= 0 })
 stack = Memory.stack
 puts stack.keys.inspect
-puts stack.values.all? { |v| v.is_a?(Integer) && v > 0 }
+puts(stack.values.all? { |v| v.is_a?(Integer) && v > 0 })
 gc = Memory.gc
 puts gc.keys.inspect
 begin

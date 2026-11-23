@@ -26,7 +26,7 @@ void sp_esp_random_init(void);
    CONFIG_ESPINEL_TEST_MARKERS. Each starts a line of its own: the newline
    before the end marker is not the program's. */
 #define ESPINEL_TEST_BEGIN "=== espinel test begin ==="
-#define ESPINEL_TEST_END "=== espinel test end, status"
+#define ESPINEL_TEST_END   "=== espinel test end, status"
 
 /* exit() ends the Ruby program, not the chip. ESP-IDF's _exit is abort(),
    which panics and reboots, so every exit, exit!, abort and uncaught

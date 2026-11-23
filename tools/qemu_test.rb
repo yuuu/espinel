@@ -72,7 +72,6 @@ def run_qemu(entry, target, timeout, log)
   writer.close
   raw = +""
   text = ""
-  started = false # the firmware's ROM banner was seen (idf.py prints its own lines before)
   status = nil
   reason = nil
   deadline = now + timeout
