@@ -40,13 +40,13 @@
 /* the byte count of a :binstr return (Spinel's sp_alloc.h) */
 extern int sp_ffi_bin_len;
 
-#define TLS_ERR_STATE (-0x10001)    /* called out of order */
-#define TLS_ERR_LENGTH (-0x10002)   /* a key, IV or tag of the wrong size */
-#define TLS_ERR_PADDING (-0x10003)  /* CBC: bad padding or a partial block */
+#define TLS_ERR_STATE    (-0x10001)    /* called out of order */
+#define TLS_ERR_LENGTH   (-0x10002)   /* a key, IV or tag of the wrong size */
+#define TLS_ERR_PADDING  (-0x10003)  /* CBC: bad padding or a partial block */
 #define TLS_ERR_KEY_TYPE (-0x10004) /* not the kind of key asked for */
-#define TLS_ERR_CURVE (-0x10005)    /* an unknown curve name */
-#define TLS_ERR_NO_MEM (-0x10006)
-#define TLS_ERR_ALG (-0x10007)      /* an unsupported digest */
+#define TLS_ERR_CURVE    (-0x10005)    /* an unknown curve name */
+#define TLS_ERR_NO_MEM   (-0x10006)
+#define TLS_ERR_ALG      (-0x10007)      /* an unsupported digest */
 
 const char *espinel_tls_error(int err) {
   static char buf[128];
@@ -156,8 +156,14 @@ static void sha_finish(sha_t *s, unsigned char *dst) {
 }
 
 static int sha_type_of(int alg, esp_sha_type *type) {
-  if (alg == MBEDTLS_MD_SHA1) { *type = SHA1; return 0; }
-  if (alg == MBEDTLS_MD_SHA256) { *type = SHA2_256; return 0; }
+  if (alg == MBEDTLS_MD_SHA1) {
+    *type = SHA1;
+    return 0;
+  }
+  if (alg == MBEDTLS_MD_SHA256) {
+    *type = SHA2_256;
+    return 0;
+  }
   return TLS_ERR_ALG;
 }
 
@@ -398,8 +404,7 @@ int espinel_tls_cipher_set_key(cipher_t *c, const unsigned char *key, size_t n) 
   if (c->op < 0 || c->key_set) return TLS_ERR_STATE;
   if (n != c->key_len) return TLS_ERR_LENGTH;
   /* esp_aes_gcm_setkey's cipher argument is not read: it is AES only */
-  int err = c->mode == MODE_CBC ? esp_aes_setkey(&c->u.aes, key, n * 8)
-                                : esp_aes_gcm_setkey(&c->u.gcm, 0, key, n * 8);
+  int err = c->mode == MODE_CBC ? esp_aes_setkey(&c->u.aes, key, n * 8) : esp_aes_gcm_setkey(&c->u.gcm, 0, key, n * 8);
   if (!err) c->key_set = true;
   return err;
 }
@@ -511,7 +516,7 @@ int espinel_tls_cipher_check_tag(cipher_t *c, const unsigned char *tag, size_t n
 /* ---- public keys: RSA and EC ---- */
 
 #define PK_RSA 1
-#define PK_EC 2
+#define PK_EC  2
 
 int espinel_tls_pk_rsa(void) { return PK_RSA; }
 int espinel_tls_pk_ec(void) { return PK_EC; }
@@ -552,8 +557,7 @@ static int pk_type(mbedtls_pk_context *pk) {
 /* the key as PEM: the private key when it has one */
 static int pk_pem(mbedtls_pk_context *pk, bool private) {
   if (!out_reserve(8192)) return TLS_ERR_NO_MEM;
-  int err = private ? mbedtls_pk_write_key_pem(pk, out, out_cap)
-                    : mbedtls_pk_write_pubkey_pem(pk, out, out_cap);
+  int err = private ? mbedtls_pk_write_key_pem(pk, out, out_cap) : mbedtls_pk_write_pubkey_pem(pk, out, out_cap);
   return err ? err : out_set(strlen((const char *)out));
 }
 
@@ -589,8 +593,7 @@ int espinel_tls_pk_public(const char *pem, size_t n) {
 }
 
 /* a key PSA generates with attr, answered as PEM; the PSA key is gone after */
-static int pk_generate(psa_key_attributes_t *attr, const uint8_t *exponent, size_t exponent_len,
-                       int type) {
+static int pk_generate(psa_key_attributes_t *attr, const uint8_t *exponent, size_t exponent_len, int type) {
   mbedtls_svc_key_id_t id;
   psa_set_key_usage_flags(attr, PSA_KEY_USAGE_EXPORT);
   psa_status_t st;
@@ -668,8 +671,8 @@ int espinel_tls_pk_sign(const char *pem, size_t n, int alg, const unsigned char 
   mbedtls_pk_init(&pk);
   err = pk_load(&pk, pem, n, &private);
   if (!err && !private) err = TLS_ERR_KEY_TYPE;
-  if (!err) err = mbedtls_pk_sign(&pk, (mbedtls_md_type_t)alg, hash, hash_len, out,
-                                  MBEDTLS_PK_SIGNATURE_MAX_SIZE, &sig_len);
+  if (!err)
+    err = mbedtls_pk_sign(&pk, (mbedtls_md_type_t)alg, hash, hash_len, out, MBEDTLS_PK_SIGNATURE_MAX_SIZE, &sig_len);
   mbedtls_pk_free(&pk);
   return err ? err : out_set(sig_len);
 }

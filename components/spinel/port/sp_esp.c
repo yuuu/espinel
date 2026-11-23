@@ -133,8 +133,17 @@ int __wrap_fflush(FILE *f) {
   return __real_fflush(stderr) ? EOF : rc;
 }
 /* picolibc: no processes to open a pipe to (newlib's popen failed in vfork) */
-FILE *popen(const char *c, const char *m) { (void)c; (void)m; errno = ENOSYS; return NULL; }
-int pclose(FILE *f) { (void)f; errno = ECHILD; return -1; }
+FILE *popen(const char *c, const char *m) {
+  (void)c;
+  (void)m;
+  errno = ENOSYS;
+  return NULL;
+}
+int pclose(FILE *f) {
+  (void)f;
+  errno = ECHILD;
+  return -1;
+}
 /* musl's count of bytes read ahead: a pushed-back byte, plus what a buffered
    stream (__SBUF, a struct __file_bufio) holds unread while reading */
 size_t __freadahead(FILE *f) {
@@ -161,7 +170,10 @@ const char *gai_strerror(int e) {
 
 /* the host name: the one lwIP gives every interface's DHCP requests */
 int gethostname(char *name, size_t len) {
-  if (!name || len <= strlen(CONFIG_LWIP_LOCAL_HOSTNAME)) { errno = ENAMETOOLONG; return -1; }
+  if (!name || len <= strlen(CONFIG_LWIP_LOCAL_HOSTNAME)) {
+    errno = ENAMETOOLONG;
+    return -1;
+  }
   strcpy(name, CONFIG_LWIP_LOCAL_HOSTNAME);
   return 0;
 }
@@ -183,14 +195,20 @@ int nanosleep(const struct timespec *req, struct timespec *rem) {
   if (!timer) {
     sem = xSemaphoreCreateBinary();
     esp_timer_create_args_t args = { .callback = sp_esp_sleep_wake, .arg = sem, .name = "sleep" };
-    if (!sem || esp_timer_create(&args, &timer) != ESP_OK) { errno = ENOMEM; return -1; }
+    if (!sem || esp_timer_create(&args, &timer) != ESP_OK) {
+      errno = ENOMEM;
+      return -1;
+    }
   }
   int64_t end = esp_timer_get_time() + (int64_t)req->tv_sec * 1000000 + (req->tv_nsec + 999) / 1000;
   for (int64_t left; (left = end - esp_timer_get_time()) > 0;) {
     esp_timer_start_once(timer, (uint64_t)left);
     xSemaphoreTake(sem, portMAX_DELAY);
   }
-  if (rem) { rem->tv_sec = 0; rem->tv_nsec = 0; }
+  if (rem) {
+    rem->tv_sec = 0;
+    rem->tv_nsec = 0;
+  }
   return 0;
 }
 /* no signal ever comes (sleep with no argument) */
@@ -201,13 +219,18 @@ int pause(void) {
 /* poll on the VFS's select */
 int poll(struct pollfd *fds, nfds_t n, int timeout_ms) {
   fd_set rd, wr, ex;
-  FD_ZERO(&rd); FD_ZERO(&wr); FD_ZERO(&ex);
+  FD_ZERO(&rd);
+  FD_ZERO(&wr);
+  FD_ZERO(&ex);
   int maxfd = -1;
   for (nfds_t i = 0; i < n; i++) {
     fds[i].revents = 0;
     int fd = fds[i].fd;
     if (fd < 0) continue;
-    if (fd >= FD_SETSIZE) { fds[i].revents = POLLNVAL; continue; }
+    if (fd >= FD_SETSIZE) {
+      fds[i].revents = POLLNVAL;
+      continue;
+    }
     if (fds[i].events & POLLIN) FD_SET(fd, &rd);
     if (fds[i].events & POLLOUT) FD_SET(fd, &wr);
     FD_SET(fd, &ex);
@@ -224,7 +247,10 @@ int poll(struct pollfd *fds, nfds_t n, int timeout_ms) {
   int ready = 0;
   for (nfds_t i = 0; i < n; i++) {
     int fd = fds[i].fd;
-    if (fd < 0 || fd >= FD_SETSIZE) { if (fds[i].revents) ready++; continue; }
+    if (fd < 0 || fd >= FD_SETSIZE) {
+      if (fds[i].revents) ready++;
+      continue;
+    }
     if (FD_ISSET(fd, &rd)) fds[i].revents |= POLLIN;
     if (FD_ISSET(fd, &wr)) fds[i].revents |= POLLOUT;
     if (FD_ISSET(fd, &ex)) fds[i].revents |= POLLERR;

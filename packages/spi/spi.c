@@ -8,8 +8,8 @@
 #include "freertos/FreeRTOS.h" /* portMAX_DELAY */
 
 #define ESPINEL_SPI_FIRST_UNIT 2
-#define ESPINEL_SPI_LAST_UNIT SOC_SPI_PERIPH_NUM
-#define ESPINEL_SPI_UNITS (ESPINEL_SPI_LAST_UNIT - ESPINEL_SPI_FIRST_UNIT + 1)
+#define ESPINEL_SPI_LAST_UNIT  SOC_SPI_PERIPH_NUM
+#define ESPINEL_SPI_UNITS      (ESPINEL_SPI_LAST_UNIT - ESPINEL_SPI_FIRST_UNIT + 1)
 /* the most one transaction carries; a longer transfer is split, with the
    chip select held between the pieces */
 #define ESPINEL_SPI_CHUNK 4092
@@ -17,9 +17,7 @@
 static bool opened[ESPINEL_SPI_UNITS];
 static spi_device_handle_t devices[ESPINEL_SPI_UNITS];
 
-static int valid_unit(int unit) {
-  return unit >= ESPINEL_SPI_FIRST_UNIT && unit <= ESPINEL_SPI_LAST_UNIT;
-}
+static int valid_unit(int unit) { return unit >= ESPINEL_SPI_FIRST_UNIT && unit <= ESPINEL_SPI_LAST_UNIT; }
 /* SPI2 is SPI2_HOST and so on */
 static spi_host_device_t host(int unit) { return (spi_host_device_t)(SPI2_HOST + unit - 2); }
 static int slot(int unit) { return unit - ESPINEL_SPI_FIRST_UNIT; }
@@ -61,8 +59,7 @@ int espinel_spi_open(int unit, int sck, int copi, int cipo) {
    the hardware drives low for each transfer (below 0: none, the program
    drives one itself). */
 int espinel_spi_device(int unit, int frequency, int mode, int lsb_first, int cs) {
-  if (!valid_unit(unit) || !opened[slot(unit)] || frequency <= 0 || mode < 0 || mode > 3)
-    return ESP_ERR_INVALID_ARG;
+  if (!valid_unit(unit) || !opened[slot(unit)] || frequency <= 0 || mode < 0 || mode > 3) return ESP_ERR_INVALID_ARG;
   int i = slot(unit);
   if (devices[i]) {
     spi_bus_remove_device(devices[i]);

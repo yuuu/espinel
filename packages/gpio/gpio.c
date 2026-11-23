@@ -20,8 +20,6 @@ int espinel_gpio_setup(int pin, int mode, int pull) {
   return gpio_set_pull_mode((gpio_num_t)pin, (gpio_pull_mode_t)pull);
 }
 
-int espinel_gpio_write(int pin, int level) {
-  return gpio_set_level((gpio_num_t)pin, (uint32_t)level);
-}
+int espinel_gpio_write(int pin, int level) { return gpio_set_level((gpio_num_t)pin, (uint32_t)level); }
 
 int espinel_gpio_read(int pin) { return gpio_get_level((gpio_num_t)pin); }

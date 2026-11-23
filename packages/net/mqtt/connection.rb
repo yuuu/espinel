@@ -66,7 +66,7 @@ module Net
         @closed = true
         if defined?(SSLSocket)
           if tls?
-            @tls.close  # closes the TCP socket too (sync_close)
+            @tls.close # closes the TCP socket too (sync_close)
             return
           end
         end
