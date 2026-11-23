@@ -2,9 +2,10 @@
 # given (`rake build PROJECT=<dir>` passes <dir>/main.rb), is
 # compiled to C by the host Spinel at build time. Its `main` is renamed
 # spinel_main and called from the Ruby task (main.c).
-# (`--ext-init`, which emits a library entry instead, does not compile for
-# a program this small: spinel_rt.h's SP_TU_NO_POLY_RENDER fallbacks clash
-# with the ext kernel's extern declarations, on any host.)
+# (`--ext-init` emits a library entry instead, whose top level is a
+# library's: it drops an `if __FILE__ == $0` block, and leaves the at_exit
+# hooks to the C library's exit, which a program here that ends by
+# returning never calls.)
 set(ESPINEL_MAIN "lib/main.rb" CACHE STRING "The Ruby program's entry point, absolute or relative to this project")
 get_filename_component(RUBY_MAIN ${ESPINEL_MAIN} ABSOLUTE BASE_DIR ${CMAKE_CURRENT_LIST_DIR}/..)
 get_filename_component(RUBY_LIB ${RUBY_MAIN} DIRECTORY)
@@ -48,12 +49,6 @@ file(GLOB_RECURSE RUBY_SRCS CONFIGURE_DEPENDS ${RUBY_LIB}/*.rb ${RUBY_PACKAGES}/
 add_custom_command(
   OUTPUT ${RUBY_C}
   COMMAND spinel -I ${RUBY_PACKAGES} ${RUBY_MAIN} -c --cc=${CMAKE_C_COMPILER} -o ${RUBY_C}
-  # A program with no ivar inspector gets an inspector table of { NULL }.
-  # GCC folds the call through it into a call to address 0, which the
-  # Xtensa linker refuses ("windowed longcall crosses 1GB boundary"), so the
-  # NULL becomes a stub that is never called (port/sp_esp.c). Spinel's
-  # src/codegen.c emits the NULL; nothing calls through an empty table.
-  COMMAND sed -i "s/^\\(static const char \\*(\\*const sp_insp_fn\\[\\])(void \\*, const uint8_t \\*) = {\\) NULL };$/\\1 sp_esp_insp_none };/" ${RUBY_C}
   DEPENDS ${RUBY_SRCS}
   COMMENT "Spinel: compiling ${ESPINEL_MAIN} to C"
   VERBATIM)
