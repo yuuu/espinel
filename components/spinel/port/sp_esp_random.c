@@ -6,9 +6,12 @@
    read-only device at that path answers with esp_fill_random.
 
    Kernel#rand seeds itself on first use from time() and clock(), which at
-   boot are the same every time; it is seeded from esp_random here instead.
-   (Random.new without a seed still mixes only time() and an address, so it
-   repeats from boot to boot until the clock is set.)
+   boot are the same every time; each VM seeds it from esp_random instead
+   (main/vm_entry.c). (Random.new without a seed still mixes only time()
+   and an address, so it repeats from boot to boot until the clock is set.)
+
+   The device is the process's, registered once (main.c); the seed is each
+   VM's.
 
    esp_random is a true random source while Wi-Fi or Bluetooth runs, or
    while the bootloader's entropy source is on; otherwise it is a
@@ -19,8 +22,6 @@
 #include <sys/types.h>
 #include "esp_random.h"
 #include "esp_vfs.h"
-
-void sp_krand_srand(uint64_t seed);
 
 static int urandom_open(const char *path, int flags, int mode) {
   (void)path; (void)flags; (void)mode;
@@ -48,5 +49,4 @@ void sp_esp_random_init(void) {
     .fstat = urandom_fstat,
   };
   esp_vfs_register("/dev/urandom", &urandom, NULL);
-  sp_krand_srand(((uint64_t)esp_random() << 32) | esp_random());
 }

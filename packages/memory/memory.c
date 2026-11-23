@@ -1,19 +1,21 @@
 /* The heap, the Ruby task's stack and Spinel's GC as numbers, for
    memory.rb. Every function answers one figure in bytes (or a count), so
-   the Ruby side binds them with plain ffi_func. */
+   the Ruby side binds them with plain ffi_func. The stack and the GC are
+   the calling program's VM's (packages/task). */
 #include <stddef.h>
 #include <stdint.h>
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "espinel_task.h"
 
-/* main/main.c and main/stack_check.c */
-extern const unsigned espinel_ruby_stack_size;
-uintptr_t sp_esp_stack_limit(void);
+static const espinel_vm none;
 
-/* Spinel's collector (lib/sp_gc.h) */
-extern size_t sp_gc_bytes, sp_gc_threshold;
-extern unsigned long long sp_gc_stat_collections, sp_gc_stat_fulls;
+/* the calling program's VM; all zeros outside one */
+static const espinel_vm *vm(void) {
+  const espinel_vm *v = espinel_vm_current();
+  return v ? v : &none;
+}
 
 /* ---- the heap ---- */
 
@@ -43,31 +45,32 @@ size_t espinel_mem_heap(int region, int what) {
 
 /* ---- the Ruby task's stack (it grows down from start + size) ---- */
 
-size_t espinel_mem_stack_size(void) { return espinel_ruby_stack_size; }
+size_t espinel_mem_stack_size(void) { return vm()->stack_size; }
 
 /* bytes in use at the caller: from the top of the stack to this frame */
 size_t espinel_mem_stack_used(void) {
-  uintptr_t top = (uintptr_t)pxTaskGetStackStart(NULL) + espinel_ruby_stack_size;
+  uintptr_t top = (uintptr_t)pxTaskGetStackStart(NULL) + vm()->stack_size;
   return top - (uintptr_t)__builtin_frame_address(0);
 }
 
 /* the most ever in use, from FreeRTOS's high-water mark (bytes on ESP-IDF) */
 size_t espinel_mem_stack_peak(void) {
-  return espinel_ruby_stack_size - uxTaskGetStackHighWaterMark(NULL);
+  return vm()->stack_size - uxTaskGetStackHighWaterMark(NULL);
 }
 
 /* the depth at which a Ruby method raises SystemStackError; the whole
    stack when the check is off (CONFIG_ESPINEL_STACK_CHECK) */
 size_t espinel_mem_stack_limit(void) {
-  uintptr_t limit = sp_esp_stack_limit();
+  const espinel_vm *v = vm();
+  uintptr_t limit = v->stack_limit ? v->stack_limit() : 0;
   uintptr_t start = (uintptr_t)pxTaskGetStackStart(NULL);
-  if (!limit) return espinel_ruby_stack_size;
-  return start + espinel_ruby_stack_size - limit;
+  if (!limit) return v->stack_size;
+  return start + v->stack_size - limit;
 }
 
 /* ---- Spinel's GC ---- */
 
-size_t espinel_mem_gc_bytes(void) { return sp_gc_bytes; }
-size_t espinel_mem_gc_threshold(void) { return sp_gc_threshold; }
-size_t espinel_mem_gc_count(void) { return (size_t)sp_gc_stat_collections; }
-size_t espinel_mem_gc_full_count(void) { return (size_t)sp_gc_stat_fulls; }
+size_t espinel_mem_gc_bytes(void) { return vm()->gc_bytes ? *vm()->gc_bytes : 0; }
+size_t espinel_mem_gc_threshold(void) { return vm()->gc_threshold ? *vm()->gc_threshold : 0; }
+size_t espinel_mem_gc_count(void) { return vm()->gc_collections ? (size_t)*vm()->gc_collections : 0; }
+size_t espinel_mem_gc_full_count(void) { return vm()->gc_fulls ? (size_t)*vm()->gc_fulls : 0; }

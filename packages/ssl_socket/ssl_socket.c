@@ -2,9 +2,10 @@
    ssl_socket.rb.
 
    A session is an Mbed TLS context and its configuration, certificates and
-   key, kept in a slot of a small table: Ruby holds the slot number, and
-   close frees the slot (the session buffers are about 20 KB, so a socket
-   that is never closed keeps them, as it keeps its descriptor). With no CA
+   key, kept in a slot of a small table of the program's: Ruby holds the
+   slot number, and close frees the slot (the session buffers are about
+   20 KB, so a socket that is never closed keeps them until its program
+   ends, as it keeps its descriptor). With no CA
    given, the peer is verified against ESP-IDF's certificate bundle
    (CONFIG_MBEDTLS_CERTIFICATE_BUNDLE), which lives in flash.
 
@@ -22,6 +23,7 @@
 #include "esp_crt_bundle.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "espinel_task.h"
 #include "mbedtls/error.h"
 #include "mbedtls/net_sockets.h"
 #include "mbedtls/pk.h"
@@ -29,8 +31,6 @@
 #include "mbedtls/ssl.h"
 #include "mbedtls/x509_crt.h"
 
-/* the byte count of a :binstr return (Spinel's sp_alloc.h) */
-extern int sp_ffi_bin_len;
 
 #define SSL_ERR_TIMEOUT (-0x10101)
 #define SSL_ERR_HANDLE (-0x10102)
@@ -46,11 +46,35 @@ typedef struct {
   mbedtls_pk_context key;
 } session_t;
 
-static session_t *sessions[SSL_SESSIONS];
-static char message[256];
+/* What one program keeps (packages/task): its sessions, why its last call
+   failed, and the bytes its last read got. A program that ends with
+   sessions open has them freed (the sockets are its runtime's). */
+typedef struct {
+  session_t *sessions[SSL_SESSIONS];
+  char message[256];
+  unsigned char *in;
+  size_t in_cap, in_len;
+} ssl_state;
+
+static void session_free(session_t *s);
+
+static void ssl_state_free(void *block) {
+  ssl_state *st = block;
+  for (int h = 0; h < SSL_SESSIONS; h++)
+    if (st->sessions[h]) session_free(st->sessions[h]);
+  free(st->in);
+}
+
+static ssl_state *state(void) {
+  static const char key;
+  return espinel_vm_local(&key, sizeof(ssl_state), ssl_state_free);
+}
 
 /* why the last call failed */
-const char *espinel_ssl_message(void) { return message; }
+const char *espinel_ssl_message(void) {
+  ssl_state *st = state();
+  return st ? st->message : "out of memory";
+}
 
 static int fail(int err, const char *what) {
   char text[128];
@@ -58,14 +82,16 @@ static int fail(int err, const char *what) {
   else if (err == SSL_ERR_HANDLE) snprintf(text, sizeof text, "closed");
   else if (err == SSL_ERR_NO_MEM) snprintf(text, sizeof text, "out of memory");
   else mbedtls_strerror(err, text, sizeof text);
-  snprintf(message, sizeof message, "%s: %s", what, text);
+  ssl_state *st = state();
+  if (st) snprintf(st->message, sizeof st->message, "%s: %s", what, text);
   return err;
 }
 
 int espinel_ssl_timed_out(int err) { return err == SSL_ERR_TIMEOUT; }
 
 static session_t *session(int h) {
-  return h >= 0 && h < SSL_SESSIONS ? sessions[h] : NULL;
+  ssl_state *st = state();
+  return st && h >= 0 && h < SSL_SESSIONS ? st->sessions[h] : NULL;
 }
 
 /* ---- the descriptor ---- */
@@ -165,12 +191,14 @@ static int parse_key(mbedtls_pk_context *key, const char *pem, size_t n) {
 static void verify_message(session_t *s) {
   uint32_t flags = mbedtls_ssl_get_verify_result(&s->ssl);
   if (flags == 0 || flags == (uint32_t)-1) return;
-  size_t len = strlen(message);
+  ssl_state *st = state();
+  if (!st) return;
+  size_t len = strlen(st->message);
   char info[160];
   mbedtls_x509_crt_verify_info(info, sizeof info, "", flags);
   for (char *p = info; *p; p++)
     if (*p == '\n') *p = *(p + 1) ? ';' : '\0';
-  snprintf(message + len, sizeof message - len, " (%s)", info);
+  snprintf(st->message + len, sizeof st->message - len, " (%s)", info);
 }
 
 /* Handshakes over the connected socket fd. host names the server for SNI
@@ -180,10 +208,12 @@ static void verify_message(session_t *s) {
 int espinel_ssl_connect(int fd, const char *host, int verify, const char *ca, size_t ca_n,
                         const char *cert, size_t cert_n, const char *key, size_t key_n,
                         int timeout_ms) {
+  ssl_state *st = state();
+  if (!st) return SSL_ERR_NO_MEM;
   int h;
-  for (h = 0; h < SSL_SESSIONS && sessions[h]; h++) {}
+  for (h = 0; h < SSL_SESSIONS && st->sessions[h]; h++) {}
   if (h == SSL_SESSIONS) {
-    snprintf(message, sizeof message, "SSL: no free session (%d are open)", SSL_SESSIONS);
+    snprintf(st->message, sizeof st->message, "SSL: no free session (%d are open)", SSL_SESSIONS);
     return SSL_ERR_NO_MEM;
   }
   /* the bundle logs every verdict; the exception carries the refusals */
@@ -229,14 +259,14 @@ int espinel_ssl_connect(int fd, const char *host, int verify, const char *ca, si
     fail(rc, what);
     /* the bundle's callback refuses a chain without saying why */
     if (rc == MBEDTLS_ERR_X509_FATAL_ERROR && verify && ca_n == 0)
-      snprintf(message, sizeof message,
+      snprintf(st->message, sizeof st->message,
                "SSL handshake: the server's certificate is not signed by a CA in ESP-IDF's bundle");
     else
       verify_message(s);
     session_free(s);
     return rc;
   }
-  sessions[h] = s;
+  st->sessions[h] = s;
   return h;
 }
 
@@ -256,12 +286,10 @@ int espinel_ssl_write(int h, const unsigned char *data, size_t n, int timeout_ms
 
 /* ---- reading ---- */
 
-static unsigned char *in;
-static size_t in_cap, in_len;
-
 const char *espinel_ssl_out(void) {
-  sp_ffi_bin_len = (int)in_len;
-  return in ? (const char *)in : "";
+  ssl_state *st = state();
+  espinel_ffi_bin_len(st ? (int)st->in_len : 0);
+  return st && st->in ? (const char *)st->in : "";
 }
 
 /* Up to max bytes, waiting for the first; 0 at the end (the peer's
@@ -269,23 +297,24 @@ const char *espinel_ssl_out(void) {
 int espinel_ssl_read(int h, size_t max, int timeout_ms) {
   session_t *s = session(h);
   if (!s) return fail(SSL_ERR_HANDLE, "SSL read");
-  if (max == 0) { in_len = 0; return 0; }
-  if (max > in_cap) {
-    unsigned char *p = realloc(in, max);
+  ssl_state *st = state();   /* there is one: session() found s in it */
+  if (max == 0) { st->in_len = 0; return 0; }
+  if (max > st->in_cap) {
+    unsigned char *p = realloc(st->in, max);
     if (!p) return fail(SSL_ERR_NO_MEM, "SSL read");
-    in = p;
-    in_cap = max;
+    st->in = p;
+    st->in_cap = max;
   }
   set_deadline(s, timeout_ms);
   for (;;) {
-    int rc = mbedtls_ssl_read(&s->ssl, in, max);
+    int rc = mbedtls_ssl_read(&s->ssl, st->in, max);
     if (rc == MBEDTLS_ERR_SSL_WANT_READ || rc == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
 #ifdef MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET
     if (rc == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) continue;
 #endif
     if (rc == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY || rc == MBEDTLS_ERR_NET_CONN_RESET) rc = 0;
     if (rc < 0) return fail(rc, "SSL read");
-    in_len = rc;
+    st->in_len = rc;
     return rc;
   }
 }
@@ -319,7 +348,7 @@ int espinel_ssl_close(int h) {
   if (!s) return 0;
   set_deadline(s, 1000);
   mbedtls_ssl_close_notify(&s->ssl);
-  sessions[h] = NULL;
+  state()->sessions[h] = NULL;
   session_free(s);
   return 0;
 }
