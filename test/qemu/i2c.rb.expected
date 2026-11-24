@@ -1,0 +1,7 @@
+set up
+IOError raised
+IOError raised
+ArgumentError: I2C0: address 128 is not 7-bit
+ArgumentError: negative length -1 given
+ArgumentError: I2C5: no such unit
+ArgumentError: I2C0: scl_pin and sda_pin are required

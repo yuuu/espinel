@@ -8,3 +8,4 @@
 /examples/*/config.rb
 /.spinel-checkout/
 /build-host-test/
+/build-test/

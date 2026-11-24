@@ -1,0 +1,4 @@
+# Added to the settings of the test firmware (rake test:qemu), which is
+# built in build-test/ with an sdkconfig of its own there.
+# The lines that tools/qemu_test.rb cuts the program's output out by
+CONFIG_ESPINEL_TEST_MARKERS=y

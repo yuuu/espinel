@@ -1,0 +1,4 @@
+sleep 0.2: true
+Machine.sleep 0.05: true
+Machine.sleep answers 1
+ArgumentError: time interval must not be negative

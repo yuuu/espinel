@@ -97,9 +97,9 @@ task "build:all" do
   end
 end
 
-desc "Remove the build directory"
+desc "Remove the build directories (build/, and build-test/ of rake test:qemu)"
 task :clean do
-  rm_rf "build"
+  rm_rf %w[build build-test build-host-test]
 end
 
 desc "Remove the build directory and the generated sdkconfig"
@@ -145,6 +145,17 @@ task :qemu, [:seconds] => :build do |_, args|
     wait
     case $rc in 124|143) exit 0 ;; *) exit $rc ;; esac
   SH
+end
+
+namespace :test do
+  desc "Run test/qemu/*.rb under QEMU against their .expected snapshots (TESTS='test/qemu/a.rb ...' for some, REGEN=1 to write the snapshots, TEST_TIMEOUT=seconds per test, TEST_TARGET=<soc>)"
+  task :qemu do
+    args = []
+    args << "--regen" if ENV["REGEN"] == "1"
+    args.push("--timeout", ENV["TEST_TIMEOUT"]) if ENV["TEST_TIMEOUT"]
+    args.push("--target", ENV["TEST_TARGET"]) if ENV["TEST_TARGET"]
+    container "ruby", "tools/qemu_test.rb", *args, *ENV.fetch("TESTS", "").split
+  end
 end
 
 def build_json(name)

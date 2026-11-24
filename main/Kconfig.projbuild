@@ -11,4 +11,13 @@ config ESPINEL_STACK_CHECK
         a third on object-heavy code under QEMU, and more on small
         recursive methods, which it keeps GCC from optimizing.
 
+config ESPINEL_TEST_MARKERS
+    bool "Mark where the Ruby program's output starts and ends"
+    default n
+    help
+        Print a line before the Ruby program starts and one with its exit
+        status after it ends, for `rake test:qemu` to cut the program's
+        output out of the boot log and to stop QEMU on. The test build turns
+        it on (test/qemu/sdkconfig.defaults).
+
 endmenu
