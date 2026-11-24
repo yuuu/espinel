@@ -1,0 +1,8 @@
+ArgumentError: GPIO99: setup failed (esp_err_t 258)
+ArgumentError: GPIO-1: setup failed (esp_err_t 258)
+ArgumentError: GPIO99 cannot output PWM
+ArgumentError: I2C0: setup failed (ESP_ERR_INVALID_ARG)
+ArgumentError: I2C0: setup failed (ESP_ERR_INVALID_ARG)
+ArgumentError: UART1: setting the pins failed (ESP_FAIL)
+ArgumentError: SPI2: setup failed (ESP_ERR_INVALID_ARG)
+ArgumentError: SPI2: setup failed (ESP_ERR_INVALID_ARG)

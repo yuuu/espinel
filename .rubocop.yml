@@ -12,6 +12,8 @@ AllCops:
     - "lib/**/*.rb"
     - "examples/**/*.rb"
     - "packages/**/*.rb"
+    - "test/**/*.rb"
+    - "tools/**/*.rb"
   Exclude:
     - "build/**/*"
     - "managed_components/**/*"

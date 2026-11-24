@@ -1,0 +1,11 @@
+risky(1) = 2
+ensure 1
+AppError: app failed
+ensure 0
+ArgumentError: negative: -1
+ensure -1
+succeeded after 3 tries
+caught 3
+100
+SystemStackError: SystemStackError
+still running

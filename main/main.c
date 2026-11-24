@@ -22,6 +22,12 @@ void sp_esp_stack_check_init(void);
 /* /dev/urandom and rand's seed (components/spinel/port/sp_esp_random.c) */
 void sp_esp_random_init(void);
 
+/* the lines `rake test:qemu` looks for (tools/qemu_test.rb), with
+   CONFIG_ESPINEL_TEST_MARKERS. Each starts a line of its own: the newline
+   before the end marker is not the program's. */
+#define ESPINEL_TEST_BEGIN "=== espinel test begin ==="
+#define ESPINEL_TEST_END   "=== espinel test end, status"
+
 /* exit() ends the Ruby program, not the chip. ESP-IDF's _exit is abort(),
    which panics and reboots, so every exit, exit!, abort and uncaught
    exception restarted the board and the program with it, over and over.
@@ -63,10 +69,17 @@ static void ruby_task(void *arg) {
   char *argv[] = { "main.rb", NULL };
   int rc;
   ruby_task_handle = xTaskGetCurrentTaskHandle();
+#if CONFIG_ESPINEL_TEST_MARKERS
+  printf("\n" ESPINEL_TEST_BEGIN "\n");
+  fflush(stdout);
+#endif
   if (setjmp(ruby_exit) == 0) rc = spinel_main(1, argv);
   else rc = ruby_exit_status;
   ruby_task_handle = NULL;
   fflush(NULL);
+#if CONFIG_ESPINEL_TEST_MARKERS
+  printf("\n" ESPINEL_TEST_END " %d\n", rc);
+#endif
   printf("spinel_main returned %d (stack left %u bytes, free heap %u bytes)\n", rc,
          (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
   vTaskDelete(NULL);

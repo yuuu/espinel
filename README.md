@@ -18,9 +18,10 @@ bundle install
 bundle exec rake image   # build the development image (ESP-IDF v6.1 plus Spinel)
 bundle exec rake build   # build the firmware
 bundle exec rake qemu    # build and run it under QEMU
+bundle exec rake test:qemu # run test/qemu/*.rb under QEMU against their snapshots
 bundle exec rake flash   # build and write it to a board over USB
 bundle exec rake monitor # reset the board and show its console
-bundle exec rake clean   # remove build/
+bundle exec rake clean   # remove build/ and build-test/
 ```
 
 Rebuild the image (`rake image`) whenever the Spinel checkout changes.
@@ -47,6 +48,47 @@ writes the firmware and then shows the output from the reset on. In the
 monitor, Ctrl-] quits and Ctrl-T Ctrl-R resets the board. The console is
 UART0 with USB Serial/JTAG as a secondary, output-only console, so the
 board's output reaches USB but input from it does not reach the program.
+
+## Tests
+
+`rake test:qemu` runs every `test/qemu/*.rb` on the emulated ESP32-S3, each
+as the program of a firmware of its own (built in `build-test/`, with
+`test/qemu/sdkconfig.defaults` added), and compares what it prints with
+`test/qemu/<name>.rb.expected`: the layout and snapshot convention of
+Spinel's `spin test`, run on the target instead of the host. A test fails
+when its output differs, its exit status is not 0, it does not build, the
+chip panics or reboots, or it does not end within 60 seconds.
+
+```sh
+bundle exec rake test:qemu                                  # every test
+bundle exec rake test:qemu TESTS='test/qemu/gpio.rb'        # some
+bundle exec rake test:qemu TESTS='test/qemu/new.rb' REGEN=1 # write the snapshot
+```
+
+```
+test/qemu/exceptions.rb ... ok
+test/qemu/gpio.rb ... FAIL (output differs; build-test/logs/gpio.log)
+    --- expected
+    +++ actual
+    @@ -1 +1 @@
+    -read: 0
+    +read: 1
+```
+
+The output is stdout and stderr together (the UART carries both), less
+ESP-IDF's log lines, which carry a timestamp. `REGEN=1` writes it as the
+snapshot; read the snapshot before committing it, since nothing else checks
+it. The whole console of each run, and its build log, are kept in
+`build-test/logs/`. `TEST_TIMEOUT` changes the limit (seconds per test,
+from QEMU's start) and `TEST_TARGET` the SoC (`esp32s3` by default; the
+only one QEMU has run).
+
+QEMU does not emulate the ESP32-S3's GPIO, I2C or SPI, nor the PWM output,
+so the tests of those packages check what can be seen without them: that
+setting up succeeds, that a bad argument raises, and that a transfer that
+cannot complete raises. GitHub Actions runs `rake test:qemu` on every pull
+request (the `qemu` job of `.github/workflows/ci.yml`) with the image the
+`build` job uses, and keeps `build-test/logs/` when it fails.
 
 ## Targets
 
@@ -249,8 +291,8 @@ so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:
 | `rake shell` | open a shell in the container |
 | `rake exec CMD='...'` | run a command in the container |
 
-`format` rewrites our C (`main/`, `components/spinel/port/`, `packages/`)
-to `.clang-format` with the image's clang-format, and corrects the Ruby
+`format` rewrites our C (`main/`, `components/spinel/port/`, `packages/`,
+`test/`) to `.clang-format` with the image's clang-format, and corrects the Ruby
 with RuboCop on the host (`.rubocop.yml`: Layout and Lint cops only). `lint` checks
 the same without changing anything and fails on any difference; CI runs it
 on every pull request.
