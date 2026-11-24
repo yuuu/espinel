@@ -99,7 +99,7 @@ end
 
 desc "Remove the build directories (build/, and build-test/ of rake test:qemu)"
 task :clean do
-  rm_rf %w[build build-test]
+  rm_rf %w[build build-test build-host-test]
 end
 
 desc "Remove the build directory and the generated sdkconfig"
@@ -208,6 +208,13 @@ end
 desc "Print the C that Spinel generates for lib/main.rb (or PROJECT=<dir>)"
 task :c do
   container "spinel", "-I", "packages", ruby_main, "-S"
+end
+
+namespace :test do
+  desc "Compile test/host/*_test.rb for the host with stubbed C and run them (TESTS='spi i2c' to choose)"
+  task :host do
+    container "ruby", "tools/host_test.rb", *ENV["TESTS"].to_s.split(/[\s,]+/)
+  end
 end
 
 desc "Decode backtrace addresses: rake addr2line ADDRS='0x4200760a 0x4202c085'"

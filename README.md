@@ -18,10 +18,11 @@ bundle install
 bundle exec rake image   # build the development image (ESP-IDF v6.1 plus Spinel)
 bundle exec rake build   # build the firmware
 bundle exec rake qemu    # build and run it under QEMU
+bundle exec rake test:host # run test/host/*_test.rb, compiled for the container
 bundle exec rake test:qemu # run test/qemu/*.rb under QEMU against their snapshots
 bundle exec rake flash   # build and write it to a board over USB
 bundle exec rake monitor # reset the board and show its console
-bundle exec rake clean   # remove build/ and build-test/
+bundle exec rake clean   # remove build/, build-test/ and build-host-test/
 ```
 
 Rebuild the image (`rake image`) whenever the Spinel checkout changes.
@@ -50,6 +51,24 @@ UART0 with USB Serial/JTAG as a secondary, output-only console, so the
 board's output reaches USB but input from it does not reach the program.
 
 ## Tests
+
+### On the host
+
+```sh
+bundle exec rake test:host                  # every test/host/*_test.rb
+bundle exec rake test:host TESTS='spi i2c'  # some of them
+```
+
+`rake test:host` compiles each `test/host/<name>_test.rb` with Spinel for
+the container itself (its gcc, not the ESP toolchain) and runs it there:
+no QEMU, no board. The packages' C is replaced by stubs
+(`test/host/stubs/`), so what is tested is the Ruby side: the MQTT
+packets and keep-alive, and what the peripheral packages hand ESP-IDF and
+make of its errors. The tests compile in parallel, each in 5 to 10
+seconds. GitHub Actions runs them on every pull request (the `unit`
+job).
+
+### Under QEMU
 
 `rake test:qemu` runs every `test/qemu/*.rb` on the emulated ESP32-S3, each
 as the program of a firmware of its own (built in `build-test/`, with
@@ -287,6 +306,8 @@ so `build/` and `sdkconfig` stay yours. `rake -T` lists the other tasks:
 | `rake size` | show the firmware's memory usage |
 | `rake menuconfig` | open menuconfig |
 | `rake c` | print the C that Spinel generates for `lib/main.rb` |
+| `rake test:host` | run the host tests (see Tests) |
+| `rake test:qemu` | run the QEMU tests (see Tests) |
 | `rake addr2line ADDRS='0x... 0x...'` | decode a backtrace |
 | `rake shell` | open a shell in the container |
 | `rake exec CMD='...'` | run a command in the container |

@@ -39,8 +39,9 @@ kept in a separate work log, not in this repository.
   one-line stubs in `sp_esp.c`).
 - `docker/Dockerfile`: `espressif/idf:v6.1` (QEMU included) plus Spinel
   built from the `spinel` build context (with the prism gem, which Spinel's
-  build runs Ruby generators with, and `make deps`). Sets
-  `SPINEL_DIR=/opt/spinel` and puts `spinel` on `PATH`.
+  build runs Ruby generators with, and `make deps`), and Spinel's host
+  runtime archive for the host tests. Sets `SPINEL_DIR=/opt/spinel` and
+  puts `spinel` on `PATH`.
 - `lib/main.rb`: the Ruby entry point by default. Other files in `lib/` are
   reached with `require_relative`, which Spinel resolves at compile time.
 - `examples/<name>/main.rb`: published programs for the XIAO ESP32S3. List
@@ -65,6 +66,21 @@ kept in a separate work log, not in this repository.
   A feature with a slash resolves to `packages/<dir>/<name>/<name>.rb`
   (`require "net/mqtt"`: `packages/net/mqtt/mqtt.rb`); Spinel's own
   `net/http` is still found, as `-I` is searched file by file.
+- `test/host/<name>_test.rb`: host tests, plain programs that check
+  themselves with `support/assert.rb` (`test`, `assert`, `assert_equal`,
+  `assert_raises`, and `finish`, which exits 1 on a failure).
+  `tools/host_test.rb` (`rake test:host`, in the container) compiles each
+  with `spinel -I packages ... --link build-host-test/libespinel_stubs.a`
+  for the container's gcc and runs it. `spinel -I packages` takes only a
+  package's Ruby (its `.c` is compiled by `main/CMakeLists.txt`, never by
+  Spinel), so the C a test gets is `test/host/stubs/<pkg>_stub.c`: the
+  package's `espinel_*` functions with ESP-IDF's values, plus `stub_*`
+  functions a test binds with `ffi_func` to read back what was passed and
+  make the next call fail (`esp_err_stub.c` has `esp_err_to_name`). Stub
+  state lasts for the whole program. The image builds Spinel's host
+  runtime (`lib/libspinel_rt.a`) for these alone. The host's Integers are
+  64-bit, the ESP32's 32-bit; MQTT's clock is `Net::MQTT.now`, which a test
+  redefines.
 - `test/qemu/*.rb`: tests, each built as the entry point (`-DESPINEL_MAIN`,
   as `PROJECT=` does) and run under QEMU by `rake test:qemu`
   (`tools/qemu_test.rb`, run in the container), which diffs the output with
@@ -211,8 +227,7 @@ The model for all of this is Spinel's own wasm32-wasi port
   `ESP_ERR_INVALID_STATE`, so QEMU checks only that the errors raise.
 - QEMU does not emulate the ESP32-S3's SPI2 or SPI3: the bus and device
   set up, and the first transfer never returns. The `spi` package's Ruby
-  side can be run on the host with a stub of its C functions
-  (`spinel -I packages ... --link stub.o`).
+  side is tested on the host instead (`test/host/spi_test.rb`).
 - LEDC (the `pwm` package) sets up without an error under QEMU, so the
   timer and channel bookkeeping can be checked there, but not the output.
 - ESP-IDF's `_exit` is `abort()`, a panic and a reboot. `main.c` defines

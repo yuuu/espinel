@@ -13,11 +13,13 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* && gem install --no-document prism -v 1.9.0
 
 # The host checkout's build outputs are left out and rebuilt here; `make deps`
-# fetches the vendored parsers if the checkout has not.
+# fetches the vendored parsers if the checkout has not. The firmware compiles
+# Spinel's runtime with the ESP toolchain itself; lib/libspinel_rt.a is the
+# host build of it, which `rake test:host` links its test programs with.
 COPY --from=spinel . /opt/spinel
 RUN cd /opt/spinel && rm -rf build bin spinel lib/*.a packages/*/build \
  && make -C /opt/spinel deps \
- && make -C /opt/spinel -j"$(nproc)" bin/spinel lib/spinel_rt_responds_generated.h \
+ && make -C /opt/spinel -j"$(nproc)" bin/spinel lib/spinel_rt_responds_generated.h lib/libspinel_rt.a \
  && /opt/spinel/bin/spinel --version
 
 ENV SPINEL_DIR=/opt/spinel \
