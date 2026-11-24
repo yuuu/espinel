@@ -97,7 +97,7 @@ task "build:all" do
   end
 end
 
-desc "Remove the build directories (build/, and build-test/ of rake test:qemu)"
+desc "Remove the build directories (build/, and build-test/ and build-host-test/ of the tests)"
 task :clean do
   rm_rf %w[build build-test build-host-test]
 end
@@ -234,4 +234,12 @@ desc "Run a command in the container: rake exec CMD='idf.py reconfigure'"
 task :exec do
   cmd = ENV.fetch("CMD") { abort "set CMD to the command to run" }
   container "bash", "-c", cmd
+end
+
+desc "Run the host tests, then the QEMU tests (rake test:host, rake test:qemu)"
+task :test do
+  # The two read TESTS differently (a name, a path), so it picks from one
+  ENV["TESTS"].to_s.empty? or abort "TESTS selects tests of one kind: use rake test:host or rake test:qemu"
+  Rake::Task["test:host"].invoke
+  Rake::Task["test:qemu"].invoke
 end
