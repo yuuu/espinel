@@ -92,8 +92,8 @@ kept in a separate work log, not in this repository.
   `=== espinel test end, status <n>` after it; the output between them,
   less ESP-IDF's log lines, is what is compared, and QEMU is stopped on the
   second marker, a panic or a reboot. CI: the `qemu` job of
-  `.github/workflows/ci.yml`. The bare `rake test` is left for an
-  aggregate of the `test:*` tasks.
+  `.github/workflows/ci.yml`. `rake test` runs `test:host`, then
+  `test:qemu`; it refuses `TESTS`, which the two read differently.
 - `main/`: compiles the entry point (`ESPINEL_MAIN`) to C at build time
   (`spinel -I packages ... -c --cc=<target gcc>`). The generated `main` is renamed with
   `-Dmain=spinel_main`, and `main.c` calls it from a FreeRTOS task with a

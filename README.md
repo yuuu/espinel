@@ -18,6 +18,7 @@ bundle install
 bundle exec rake image   # build the development image (ESP-IDF v6.1 plus Spinel)
 bundle exec rake build   # build the firmware
 bundle exec rake qemu    # build and run it under QEMU
+bundle exec rake test      # run the host tests, then the QEMU tests (see Tests)
 bundle exec rake test:host # run test/host/*_test.rb, compiled for the container
 bundle exec rake test:qemu # run test/qemu/*.rb under QEMU against their snapshots
 bundle exec rake flash   # build and write it to a board over USB
@@ -51,6 +52,9 @@ UART0 with USB Serial/JTAG as a secondary, output-only console, so the
 board's output reaches USB but input from it does not reach the program.
 
 ## Tests
+
+`rake test` runs both kinds below, the host tests first; `TESTS=` goes to
+`rake test:host` or `rake test:qemu`, which name tests differently.
 
 ### On the host
 
