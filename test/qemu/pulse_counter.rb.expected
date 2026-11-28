@@ -1,0 +1,7 @@
+[0, 0, 0]
+nil
+ArgumentError: PulseCounter(GPIO99, GPIO8): setup failed (ESP_ERR_INVALID_ARG)
+ArgumentError: PulseCounter(GPIO7, GPIO7): setup failed (ESP_ERR_INVALID_ARG)
+ArgumentError: PulseCounter(GPIO7, GPIO8): setup failed (ESP_ERR_INVALID_ARG)
+4
+ArgumentError: PulseCounter(GPIO9, GPIO10): every PCNT unit is taken

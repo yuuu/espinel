@@ -1,0 +1,4 @@
+[package]
+name = "pulse_counter"
+version = "0.1.0"
+sources = ["pulse_counter.c"]

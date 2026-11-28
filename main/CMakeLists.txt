@@ -29,7 +29,7 @@ set(SPINEL_PACKAGE_C_SRCS
 idf_component_register(SRCS "main.c" "stack_check.c" "${RUBY_C}" ${PACKAGE_C_SRCS} ${SPINEL_PACKAGE_C_SRCS}
                        PRIV_INCLUDE_DIRS ${SPINEL_PACKAGES}/json ${SPINEL_PACKAGES}/stringio
                        PRIV_REQUIRES spinel esp_driver_gpio esp_driver_uart
-                                     esp_driver_i2c esp_driver_spi esp_driver_ledc
+                                     esp_driver_i2c esp_driver_spi esp_driver_ledc esp_driver_pcnt
                                      esp_netif esp_event esp_wifi esp_eth nvs_flash esp_timer
                                      mbedtls)
 

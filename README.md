@@ -150,6 +150,7 @@ checkout is mounted into the container. `require "<package>"` still finds
 | `aws_iot` | connects to AWS IoT Core over MQTT with TLS and the thing's certificate, publishes telemetry every 10 seconds and prints what arrives on `<thing>/cmd`; set Wi-Fi, the endpoint, the thing's name, certificate and key in `config.rb` (from `config.example.rb`) |
 | `oled` | "Spinel on ESP32" animated on a 128x64 SSD1306 OLED at 0x3C (SDA to D4, SCL to D5): a scan line draws the title, the subtitle types itself, a glint sweeps across; the driver and a 5x7 font are plain Ruby beside it |
 | `lidar` | a radar of what a YDLIDAR X2 sees, on the `oled` example's SSD1306 (same wiring): one rotation as a map seen from above with a ring per metre, the scan frequency, the point count and the nearest point; the X2's TX to D0, VCC to 5V. The packet parser is plain Ruby beside it |
+| `encoder` | counts a quadrature encoder (a geared motor's Hall encoder, a rotary knob) on the PCNT and prints the count, its change and the speed ten times a second; phase A to D4, phase B to D5 |
 
 A build without `PROJECT` goes back to `lib/main.rb`.
 
@@ -168,6 +169,7 @@ firmware.
 | `memory` | `Memory.heap(region = :all)` (`:internal`, `:spiram`), `Memory.stack` (the Ruby task's: used here, peak, where `SystemStackError` comes) and `Memory.gc` (Spinel's counted bytes, next collection, collections) as Hashes of bytes; `Memory.report` prints them as three lines with bars, `Memory.summary` as one |
 | `net/mqtt` | An MQTT 3.1.1 client, as in PicoRuby: `Net::MQTT::Client.new(host, port = 1883, client_id:, keep_alive: 60, clean_session: true, username:, password:, ssl: false, ssl_context:, will_topic:, will_payload:, will_qos:, will_retain:)` (or `Client.connect(...)` with a block); `connect`, `publish(topic, payload, retain: false, qos: 0)`, `subscribe(*topics, qos: 0)`, `unsubscribe(*topics)`, `receive(timeout: nil)` (`[topic, payload]`, or nil when the time ran out), `ping`, `disconnect`, `connected?`. QoS 0 and 1. A refused CONNECT raises `Net::MQTT::ConnectionError` |
 | `network` | `Network::WiFi`, as in PicoRuby: `init(country = nil)`, `connect_timeout(ssid, password, auth, seconds = 60)` with `Network::WiFi::Auth::OPEN`, `WPA_TKIP_PSK`, `WPA2_AES_PSK`, `WPA2_MIXED_PSK` or `WPA3_PSK` (the weakest security accepted), `disconnect`, `link_connected?`, `tcpip_link_status(_name)`, `ipv4_address`, `ipv4_netmask`, `ipv4_gateway`, `dhcp_supplied?`. `Network::Ethernet.connect_timeout(seconds = 60)` and the same address readers, for QEMU |
+| `pulse_counter` | `PulseCounter.new(pin_a, pin_b, glitch_ns: 1000, pull_up: true)`, a quadrature encoder counted at x4 on the PCNT peripheral, as in PicoRuby (picoruby-pulse_counter); `count` (signed, past the 16-bit hardware counter), `clear`. Pulses shorter than `glitch_ns` are ignored (0 turns the filter off). One PCNT unit per counter (4 on the ESP32-S3; none on the ESP32-C2 and -C3, where the setup raises) |
 | `pwm` | `PWM.new(pin, frequency:, duty: 50)` on the LEDC peripheral (without `frequency:` the pin is taken but not started); `frequency(hz)` (0 stops it, low), `period_us(us)`, `duty(percent)`, `pulse_width_us(us)`. One LEDC channel per PWM (8 on the ESP32-S3), at up to four frequencies at once |
 | `spi` | `SPI.new(unit = 2, frequency: 1_000_000, mode: 0, first_bit: SPI::MSB_FIRST, sck_pin:, copi_pin:, cipo_pin:, cs_pin:)`, a controller on SPI2 or SPI3; `cs_pin:` (optional) is driven low for each call. `write(*outputs)` (Integers, Arrays of them, Strings), `read(bytes)` (sends zeros), `transfer(outputs, additional_read_bytes = 0)` answers the bytes clocked in, `setmode(...)` |
 | `ssl_socket` | TLS clients, as in PicoRuby: `SSLSocket.open(host, port, ctx = SSLContext.new)`, or `SSLSocket.new(tcp_socket, ctx)` with `hostname=` and `connect`; `write`, `puts`, `print`, `gets`, `read`, `readpartial`, `eof?`, `close` (`sync_close` also closes the TCP socket, by default), `timeout=`, `cipher`, `ssl_version`, `verify_result`. `SSLContext`: `verify_mode=` (`VERIFY_PEER`, the default, or `VERIFY_NONE`), `set_ca_pem`, `set_cert_pem`, `set_key_pem` |
@@ -222,6 +224,14 @@ require "pwm"
 servo = PWM.new(2, frequency: 50)  # XIAO ESP32S3's D1
 servo.pulse_width_us(1500)         # the middle
 led = PWM.new(1, frequency: 1000, duty: 10)
+```
+
+```ruby
+require "pulse_counter"
+
+encoder = PulseCounter.new(5, 6)  # A to D4, B to D5; swap them to flip the sign
+sleep 1
+puts encoder.count                # x4: 4 counts per encoder line
 ```
 
 ### Networking
